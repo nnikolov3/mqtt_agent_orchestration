@@ -54,7 +54,16 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 		return "", fmt.Errorf("task requires role %s, but worker is %s", workflowTask.RequiredRole, p.role)
 	}
 	
-	// Get RAG context if available
+	// Get system prompt for this role from RAG
+	var systemPrompt string
+	if p.ragService != nil {
+		prompt, err := p.ragService.GetSystemPrompt(ctx, p.role)
+		if err == nil {
+			systemPrompt = prompt
+		}
+	}
+	
+	// Get relevant context if available
 	var ragContext string
 	if p.ragService != nil && p.capabilities.RAGEnabled {
 		context, err := p.ragService.GetRelevantContext(ctx, workflowTask.Type, 
@@ -64,84 +73,93 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 		}
 	}
 	
+	// Create enhanced task context for token optimization
+	taskContext := &EnhancedTaskContext{
+		SystemPrompt: systemPrompt,
+		RAGContext:   ragContext,
+		Task:         workflowTask,
+	}
+	
 	// Process based on role and task type
 	switch p.role {
 	case types.RoleDeveloper:
-		return p.processDeveloperTask(ctx, workflowTask, ragContext)
+		return p.processDeveloperTask(ctx, taskContext)
 	case types.RoleReviewer:
-		return p.processReviewerTask(ctx, workflowTask, ragContext)
+		return p.processReviewerTask(ctx, taskContext)
 	case types.RoleApprover:
-		return p.processApproverTask(ctx, workflowTask, ragContext)
+		return p.processApproverTask(ctx, taskContext)
 	case types.RoleTester:
-		return p.processTesterTask(ctx, workflowTask, ragContext)
+		return p.processTesterTask(ctx, taskContext)
 	default:
 		return "", fmt.Errorf("unsupported role: %s", p.role)
 	}
 }
 
+// EnhancedTaskContext provides optimized context for AI API calls
+type EnhancedTaskContext struct {
+	SystemPrompt string
+	RAGContext   string
+	Task         *types.WorkflowTask
+}
+
 // processDeveloperTask handles initial content creation
-func (p *RoleBasedProcessor) processDeveloperTask(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	switch task.Type {
+func (p *RoleBasedProcessor) processDeveloperTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	switch taskContext.Task.Type {
 	case "create_document":
-		return p.createDocument(ctx, task, ragContext)
+		return p.createDocument(ctx, taskContext)
 	default:
-		return "", fmt.Errorf("developer role doesn't support task type: %s", task.Type)
+		return "", fmt.Errorf("developer role doesn't support task type: %s", taskContext.Task.Type)
 	}
 }
 
 // processReviewerTask handles content review and improvement
-func (p *RoleBasedProcessor) processReviewerTask(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	if task.PreviousOutput == "" {
+func (p *RoleBasedProcessor) processReviewerTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	if taskContext.Task.PreviousOutput == "" {
 		return "", fmt.Errorf("reviewer task requires previous output")
 	}
 	
-	switch task.Type {
+	switch taskContext.Task.Type {
 	case "create_document":
-		return p.reviewDocument(ctx, task, ragContext)
+		return p.reviewDocument(ctx, taskContext)
 	default:
-		return "", fmt.Errorf("reviewer role doesn't support task type: %s", task.Type)
+		return "", fmt.Errorf("reviewer role doesn't support task type: %s", taskContext.Task.Type)
 	}
 }
 
 // processApproverTask handles final approval
-func (p *RoleBasedProcessor) processApproverTask(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	if task.PreviousOutput == "" {
+func (p *RoleBasedProcessor) processApproverTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	if taskContext.Task.PreviousOutput == "" {
 		return "", fmt.Errorf("approver task requires previous output")
 	}
 	
-	switch task.Type {
+	switch taskContext.Task.Type {
 	case "create_document":
-		return p.approveDocument(ctx, task, ragContext)
+		return p.approveDocument(ctx, taskContext)
 	default:
-		return "", fmt.Errorf("approver role doesn't support task type: %s", task.Type)
+		return "", fmt.Errorf("approver role doesn't support task type: %s", taskContext.Task.Type)
 	}
 }
 
 // processTesterTask handles testing and validation
-func (p *RoleBasedProcessor) processTesterTask(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	switch task.Type {
+func (p *RoleBasedProcessor) processTesterTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	switch taskContext.Task.Type {
 	case "create_document":
-		return p.testDocument(ctx, task, ragContext)
+		return p.testDocument(ctx, taskContext)
 	default:
-		return "", fmt.Errorf("tester role doesn't support task type: %s", task.Type)
+		return "", fmt.Errorf("tester role doesn't support task type: %s", taskContext.Task.Type)
 	}
 }
 
-// createDocument creates initial document content
-func (p *RoleBasedProcessor) createDocument(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	documentType := task.Payload["document_type"]
+// createDocument creates initial document content with optimized context
+func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	documentType := taskContext.Task.Payload["document_type"]
 	
-	var prompt string
-	switch documentType {
-	case "go_coding_standards":
-		prompt = p.buildGoCodingStandardsPrompt(ragContext)
-	default:
-		return "", fmt.Errorf("unknown document type: %s", documentType)
-	}
+	// Build optimized prompt using system prompt and RAG context
+	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
 	
 	// Use most appropriate AI helper for initial creation
 	aiHelper := p.selectAIHelper("development")
-	cmd := exec.CommandContext(ctx, aiHelper, prompt)
+	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("AI helper %s failed: %w", aiHelper, err)
@@ -150,29 +168,14 @@ func (p *RoleBasedProcessor) createDocument(ctx context.Context, task *types.Wor
 	return string(output), nil
 }
 
-// reviewDocument reviews and improves existing content
-func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	previousContent := task.PreviousOutput
-	documentType := task.Payload["document_type"]
-	
-	prompt := fmt.Sprintf(`Review and improve this %s document. Focus on:
-1. Completeness - are all important topics covered?
-2. Accuracy - are the guidelines correct and up-to-date?
-3. Clarity - is the content clear and well-organized?
-4. Examples - are there good/bad code examples?
-5. Consistency - is the style and format consistent?
-
-Use this context for reference:
-%s
-
-Previous version to review:
-%s
-
-Provide the improved version with clear explanations of changes made.`, documentType, ragContext, previousContent)
+// reviewDocument reviews and improves existing content with optimized context
+func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	// Build optimized prompt for review phase
+	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "review", taskContext.Task.Payload["document_type"])
 	
 	// Use AI helper focused on review/analysis
 	aiHelper := p.selectAIHelper("review")
-	cmd := exec.CommandContext(ctx, aiHelper, prompt)
+	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("review AI helper %s failed: %w", aiHelper, err)
@@ -181,32 +184,14 @@ Provide the improved version with clear explanations of changes made.`, document
 	return string(output), nil
 }
 
-// approveDocument performs final approval check
-func (p *RoleBasedProcessor) approveDocument(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	content := task.PreviousOutput
-	documentType := task.Payload["document_type"]
-	
-	prompt := fmt.Sprintf(`Perform final approval check for this %s document. 
-Check for:
-1. Technical accuracy
-2. Completeness 
-3. Production readiness
-4. Adherence to standards
-5. No factual errors
-
-Context:
-%s
-
-Document to approve:
-%s
-
-Respond with either:
-APPROVED: [brief explanation]
-REJECTED: [specific issues that need fixing]`, documentType, ragContext, content)
+// approveDocument performs final approval check with optimized context
+func (p *RoleBasedProcessor) approveDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	// Build optimized prompt for approval phase
+	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "approve", taskContext.Task.Payload["document_type"])
 	
 	// Use AI helper best for final analysis
 	aiHelper := p.selectAIHelper("approval")
-	cmd := exec.CommandContext(ctx, aiHelper, prompt)
+	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("approval AI helper %s failed: %w", aiHelper, err)
@@ -216,15 +201,49 @@ REJECTED: [specific issues that need fixing]`, documentType, ragContext, content
 }
 
 // testDocument validates the document
-func (p *RoleBasedProcessor) testDocument(ctx context.Context, task *types.WorkflowTask, ragContext string) (string, error) {
-	content := task.PreviousOutput
+func (p *RoleBasedProcessor) testDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
+	content := taskContext.Task.PreviousOutput
 	
 	// For coding standards, test by checking examples compile/lint
-	if task.Payload["document_type"] == "go_coding_standards" {
+	if taskContext.Task.Payload["document_type"] == "go_coding_standards" {
 		return p.testGoCodingStandards(ctx, content)
 	}
 	
 	return "Document testing not implemented for this type", nil
+}
+
+// buildOptimizedPrompt creates token-efficient prompts using system prompt and RAG context
+func (p *RoleBasedProcessor) buildOptimizedPrompt(taskContext *EnhancedTaskContext, phase, documentType string) string {
+	var prompt strings.Builder
+	
+	// Start with system prompt for role context (reduces token usage by providing clear role definition)
+	if taskContext.SystemPrompt != "" {
+		prompt.WriteString(taskContext.SystemPrompt)
+		prompt.WriteString("\n\n")
+	}
+	
+	// Add relevant RAG context (reduces token usage by providing specific domain knowledge)
+	if taskContext.RAGContext != "" {
+		prompt.WriteString("Relevant Context:\n")
+		prompt.WriteString(taskContext.RAGContext)
+		prompt.WriteString("\n\n")
+	}
+	
+	// Add phase-specific instructions (concise and targeted)
+	switch phase {
+	case "create":
+		prompt.WriteString(fmt.Sprintf("Create a comprehensive %s document.", documentType))
+		
+	case "review":
+		prompt.WriteString(fmt.Sprintf("Review and improve this %s document.\n\nPrevious version:\n%s", 
+			documentType, taskContext.Task.PreviousOutput))
+			
+	case "approve":
+		prompt.WriteString(fmt.Sprintf("Perform final approval for this %s document.\n\nContent to approve:\n%s\n\nRespond with APPROVED: [reason] or REJECTED: [issues]", 
+			documentType, taskContext.Task.PreviousOutput))
+	}
+	
+	return prompt.String()
 }
 
 // Helper methods

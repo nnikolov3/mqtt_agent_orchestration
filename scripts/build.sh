@@ -225,6 +225,7 @@ function main() {
     build_go_binary "orchestrator" "./cmd/orchestrator"
     build_go_binary "role-worker" "./cmd/role-worker"
     build_go_binary "client" "./cmd/client"
+    build_go_binary "rag-service" "./cmd/rag-service"
     
     log_info "Build completed successfully"
     log_info "Binaries available in: $BUILD_DIR_GLOBAL/"
