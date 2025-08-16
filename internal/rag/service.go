@@ -2,10 +2,12 @@ package rag
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"log"
 	"net"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -263,12 +265,42 @@ func (s *Service) IsAvailable(ctx context.Context) bool {
 // generateLocalEmbedding generates embeddings using local Qwen3-Embedding-4B model
 // Returns nil if the embedding model is unavailable - caller must handle this explicitly
 func (s *Service) generateLocalEmbedding(text string) []float32 {
-	// Use llama-server with Qwen3-Embedding-4B model when needed
-	// Following "Do more with less" - use existing llama-server binary
-	// Real implementation would start llama-server, make HTTP call, parse response
-	// TODO: Implement actual embedding generation using /home/niko/bin/llama-server
-
-	return nil
+	// Use llama-embedding binary with Qwen3-Embedding-4B model
+	// Following "Do more with less" - use existing llama-embedding binary from /home/niko/bin
+	
+	// Implementation using llama-embedding CLI for reliable embeddings
+	cmd := fmt.Sprintf(`/home/niko/bin/llama-embedding -m /data/models/Qwen3-Embedding-4B-Q8_0.gguf -p %q --embd-output-format json --embd-normalize 2`, text)
+	
+	// Execute embedding generation
+	output, err := exec.Command("sh", "-c", cmd).Output()
+	if err != nil {
+		log.Printf("Embedding generation failed: %v", err)
+		return nil
+	}
+	
+	// Parse JSON response
+	var embeddingResponse struct {
+		Data []struct {
+			Embedding []float32 `json:"embedding"`
+		} `json:"data"`
+	}
+	
+	if err := json.Unmarshal(output, &embeddingResponse); err != nil {
+		log.Printf("Failed to parse embedding response: %v", err)
+		return nil
+	}
+	
+	if len(embeddingResponse.Data) == 0 {
+		log.Printf("No embedding data returned")
+		return nil
+	}
+	
+	embedding := embeddingResponse.Data[0].Embedding
+	if len(embedding) != 2560 {
+		log.Printf("Warning: Expected 2560-dim embedding, got %d dimensions", len(embedding))
+	}
+	
+	return embedding
 }
 
 // hashString creates a consistent hash for string values

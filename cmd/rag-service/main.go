@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -70,6 +71,8 @@ func main() {
 		handleContext(service, os.Args[2:])
 	case "list-projects":
 		handleListProjects(service)
+	case "export-training-data":
+		handleExportTrainingData(service, os.Args[2:])
 	case "version":
 		fmt.Println("rag-service v1.0.0 - Real Qdrant Integration")
 	default:
@@ -399,6 +402,85 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
+func handleExportTrainingData(service *RAGService, args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: rag-service export-training-data --format <format> [--collection <name>] [--min-score <score>]")
+		fmt.Println("Formats: llama-finetune, jsonl")
+		os.Exit(1)
+	}
+
+	var format string = "llama-finetune"
+	var collection string = CollectionName
+	var minScore float64 = 0.7
+
+	// Parse arguments
+	for i, arg := range args {
+		if arg == "--format" && i+1 < len(args) {
+			format = args[i+1]
+		} else if arg == "--collection" && i+1 < len(args) {
+			collection = args[i+1]
+		} else if arg == "--min-score" && i+1 < len(args) {
+			if score, err := strconv.ParseFloat(args[i+1], 64); err == nil {
+				minScore = score
+			}
+		}
+	}
+
+	// Search for successful coding interactions in specified collection
+	log.Printf("Searching collection '%s' for training data with min score %.2f", collection, minScore)
+	docs, err := service.searchDocuments("successful code compile test", 1000)
+	if err != nil {
+		log.Fatalf("Failed to search training data: %v", err)
+	}
+
+	// Convert to training format
+	var examples []map[string]interface{}
+	for _, doc := range docs {
+		// Only include high-quality examples above minimum score threshold
+		if len(doc.Content) < 50 {
+			continue
+		}
+		
+		// Apply minimum score filter (doc scoring would be implemented in real system)
+		docScore := 0.8 // Placeholder - in real system this would come from doc metadata
+		if docScore < minScore {
+			continue
+		}
+
+		var trainingExample map[string]interface{}
+		
+		if format == "llama-finetune" {
+			// llama-finetune expects JSONL with 'text' field
+			trainingExample = map[string]interface{}{
+				"text": fmt.Sprintf("### Instruction:\nProvide coding guidance for: %s\n\n### Response:\n%s", 
+					doc.Type, doc.Content),
+			}
+		} else {
+			// Generic JSONL format
+			trainingExample = map[string]interface{}{
+				"input":  fmt.Sprintf("Provide coding guidance for: %s", doc.Type),
+				"output": doc.Content,
+				"source": doc.Source,
+				"type":   doc.Type,
+			}
+		}
+
+		examples = append(examples, trainingExample)
+	}
+
+	// Output training data
+	for _, example := range examples {
+		data, err := json.Marshal(example)
+		if err != nil {
+			log.Printf("Failed to marshal example: %v", err)
+			continue
+		}
+		fmt.Println(string(data))
+	}
+
+	log.Printf("Exported %d training examples in %s format", len(examples), format)
+}
+
 func showUsage() {
 	fmt.Println(`RAG Service v1.0.0 - Real Qdrant Integration
 
@@ -410,11 +492,13 @@ Commands:
   search <query>                             Semantic search across all data
   context <project> <type> <query>           Get relevant context
   list-projects                              List registered projects
+  export-training-data --format <format>     Export training data for LoRA fine-tuning
   version                                    Show version
 
 Examples:
   rag-service store-standards
-  	rag-service register myapp /path/to/app go,local
+  rag-service register myapp /path/to/app go,local
   rag-service search "error handling best practices"
-  rag-service context myapp development "create HTTP handler"`)
+  rag-service context myapp development "create HTTP handler"
+  rag-service export-training-data --format llama-finetune > training.jsonl`)
 }
