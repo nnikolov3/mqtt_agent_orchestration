@@ -6,34 +6,34 @@ package types
 
 const (
 	// Task-related topics
-	TaskNewTopic        = "tasks/new"
-	TaskResultTopic     = "tasks/result"
-	TaskFailedTopic     = "tasks/failed"
-	TaskStatusTopic     = "tasks/status"
-	
+	TaskNewTopic    = "tasks/new"
+	TaskResultTopic = "tasks/result"
+	TaskFailedTopic = "tasks/failed"
+	TaskStatusTopic = "tasks/status"
+
 	// Role-specific task topics
-	TaskDeveloperTopic  = "tasks/developer"
-	TaskReviewerTopic   = "tasks/reviewer"
-	TaskApproverTopic   = "tasks/approver"
-	TaskTesterTopic     = "tasks/tester"
-	
+	TaskDeveloperTopic = "tasks/developer"
+	TaskReviewerTopic  = "tasks/reviewer"
+	TaskApproverTopic  = "tasks/approver"
+	TaskTesterTopic    = "tasks/tester"
+
 	// Worker status topics
-	WorkerStatusTopic   = "workers/status"
+	WorkerStatusTopic    = "workers/status"
 	WorkerHeartbeatTopic = "workers/heartbeat"
-	
+
 	// Embedding service topics
 	EmbeddingRequestTopic  = "embeddings/request"
 	EmbeddingResponseTopic = "embeddings/response"
-	
+
 	// AI service topics
-	AIRequestTopicPrefix   = "ai/request/"   // e.g., "ai/request/cerebras"
-	AIResponseTopicPrefix  = "ai/response/"  // e.g., "ai/response/cerebras"
-	
+	AIRequestTopicPrefix  = "ai/request/"  // e.g., "ai/request/cerebras"
+	AIResponseTopicPrefix = "ai/response/" // e.g., "ai/response/cerebras"
+
 	// RAG service topics
-	RAGQueryTopic     = "rag/query"
-	RAGResponseTopic  = "rag/response"
-	RAGTrainTopic     = "rag/train"
-	
+	RAGQueryTopic    = "rag/query"
+	RAGResponseTopic = "rag/response"
+	RAGTrainTopic    = "rag/train"
+
 	// System control topics
 	SystemHealthTopic = "system/health"
 	SystemConfigTopic = "system/config"

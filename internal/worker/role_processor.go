@@ -27,7 +27,7 @@ type RoleBasedProcessor struct {
 func NewRoleBasedProcessor(role types.WorkerRole, ragService *rag.Service, modelManager *localmodels.Manager, contentAnalyzer *ContentAnalyzer, aiConfig *ai.AIHelperConfig) *RoleBasedProcessor {
 	capabilities := GetCapabilitiesForRole(role)
 	taskRouter := NewTaskRouter(modelManager, aiConfig)
-	
+
 	return &RoleBasedProcessor{
 		role:            role,
 		capabilities:    capabilities,
@@ -72,7 +72,7 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 	}
 
 	// Log routing decision for monitoring
-	fmt.Printf("Task routed: %s (Strategy: %v, Model: %s, API: %s)\n", 
+	fmt.Printf("Task routed: %s (Strategy: %v, Model: %s, API: %s)\n",
 		execution.Reasoning, execution.Strategy, execution.ModelName, execution.APIProvider)
 
 	// Get RAG context if enabled

@@ -39,14 +39,14 @@ func (e *TrainingDataExporter) ExportTrainingData(ctx context.Context, collectio
 	}
 
 	var examples []localmodels.TrainingExample
-	
+
 	for _, point := range searchResult {
 		example, err := e.extractTrainingExample(point, minScore)
 		if err != nil {
 			log.Printf("Skipping point %v: %v", point.Id, err)
 			continue
 		}
-		
+
 		if example != nil {
 			examples = append(examples, *example)
 		}
@@ -138,7 +138,7 @@ func (e *TrainingDataExporter) ExportSuccessfulCodeInteractions(ctx context.Cont
 	}
 
 	var examples []localmodels.TrainingExample
-	
+
 	for _, doc := range response.Documents {
 		// Only include high-score examples (successful interactions)
 		if doc.Score < 0.8 {
@@ -160,19 +160,19 @@ func (e *TrainingDataExporter) ExportSuccessfulCodeInteractions(ctx context.Cont
 func (e *TrainingDataExporter) parseCodeInteraction(content string, score float64) *localmodels.TrainingExample {
 	// Look for common patterns in successful code interactions
 	lines := strings.Split(content, "\n")
-	
+
 	var input, output strings.Builder
 	var inOutput bool
-	
+
 	for _, line := range lines {
 		// Detect transition from input to output
 		if strings.Contains(strings.ToLower(line), "response:") ||
-		   strings.Contains(strings.ToLower(line), "output:") ||
-		   strings.Contains(strings.ToLower(line), "solution:") {
+			strings.Contains(strings.ToLower(line), "output:") ||
+			strings.Contains(strings.ToLower(line), "solution:") {
 			inOutput = true
 			continue
 		}
-		
+
 		if inOutput {
 			output.WriteString(line + "\n")
 		} else {
@@ -210,15 +210,15 @@ func (e *TrainingDataExporter) StoreTrainingMetrics(ctx context.Context, example
 	}
 
 	avgScore := totalScore / float64(totalExamples)
-	
+
 	// Create metrics document
 	metrics := map[string]interface{}{
-		"timestamp":           time.Now().Unix(),
-		"total_examples":      totalExamples,
-		"average_score":       avgScore,
-		"high_quality_count":  highQualityCount,
-		"high_quality_ratio":  float64(highQualityCount) / float64(totalExamples),
-		"export_date":         time.Now().Format("2006-01-02"),
+		"timestamp":          time.Now().Unix(),
+		"total_examples":     totalExamples,
+		"average_score":      avgScore,
+		"high_quality_count": highQualityCount,
+		"high_quality_ratio": float64(highQualityCount) / float64(totalExamples),
+		"export_date":        time.Now().Format("2006-01-02"),
 	}
 
 	// Store in RAG database
@@ -273,7 +273,7 @@ func (e *TrainingDataExporter) ReinforcementLearningExport(ctx context.Context) 
 	for i := range successfulExamples {
 		// Boost scores for examples that demonstrate good practices
 		content := strings.ToLower(successfulExamples[i].Input + " " + successfulExamples[i].Output)
-		
+
 		// Reward good practices
 		if strings.Contains(content, "error handling") {
 			successfulExamples[i].Score += 0.1

@@ -204,6 +204,7 @@ function start_orchestrator() {
     fi
     
     # Start orchestrator in background
+    # shellcheck disable=SC2086
     "$PROJECT_ROOT_GLOBAL/bin/orchestrator" $orchestrator_args \
         > "$orchestrator_log" 2>&1 &
     
@@ -243,6 +244,7 @@ function start_role_workers() {
         
         worker_log="$PROJECT_ROOT_GLOBAL/logs/${role}-worker.log"
         
+        # shellcheck disable=SC2086
         "$PROJECT_ROOT_GLOBAL/bin/role-worker" $worker_args \
             > "$worker_log" 2>&1 &
         

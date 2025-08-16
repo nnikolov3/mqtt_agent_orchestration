@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	mqttHost   = flag.String("mqtt-host", "localhost", "MQTT broker host")
-	mqttPort   = flag.Int("mqtt-port", 1883, "MQTT broker port")
-	modelPath  = flag.String("model-path", "/data/models/Qwen3-Embedding-4B-Q8_0.gguf", "Path to embedding model")
-	help       = flag.Bool("help", false, "Show help message")
+	mqttHost  = flag.String("mqtt-host", "localhost", "MQTT broker host")
+	mqttPort  = flag.Int("mqtt-port", 1883, "MQTT broker port")
+	modelPath = flag.String("model-path", "/data/models/Qwen3-Embedding-4B-Q8_0.gguf", "Path to embedding model")
+	help      = flag.Bool("help", false, "Show help message")
 )
 
 func main() {
@@ -47,7 +47,7 @@ func main() {
 
 	// Start the embedding worker
 	log.Printf("Starting embedding worker on %s:%d with model: %s", *mqttHost, *mqttPort, *modelPath)
-	
+
 	if err := embeddingWorker.Start(ctx); err != nil {
 		log.Fatalf("Failed to start embedding worker: %v", err)
 	}

@@ -147,12 +147,10 @@ export_merged_model() {
     local adapter_path="$LORA_ADAPTERS_PATH/$ADAPTER_NAME.bin"
     local merged_path="$MODELS_PATH/$(basename "$BASE_MODEL" .gguf)-${ADAPTER_NAME}.gguf"
     
-    "$LLAMA_BIN_PATH/llama-export-lora" \
+    if "$LLAMA_BIN_PATH/llama-export-lora" \
         --model "$model_path" \
         --lora "$adapter_path" \
-        --output "$merged_path"
-    
-    if [[ $? -eq 0 ]]; then
+        --output "$merged_path"; then
         log_info "Merged model exported to: $merged_path"
         
         # Test the merged model

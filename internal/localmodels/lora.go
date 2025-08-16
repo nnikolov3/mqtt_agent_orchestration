@@ -13,23 +13,23 @@ import (
 
 // LoRAConfig represents LoRA training configuration
 type LoRAConfig struct {
-	ModelPath       string  `yaml:"model_path"`
-	TrainingData    string  `yaml:"training_data"`
-	OutputPath      string  `yaml:"output_path"`
-	LoRAR           int     `yaml:"lora_r"`           // LoRA rank
-	LoRAAlpha       int     `yaml:"lora_alpha"`       // LoRA alpha
-	BatchSize       int     `yaml:"batch_size"`
-	GradAccSteps    int     `yaml:"grad_acc_steps"`
-	LearningRate    float64 `yaml:"learning_rate"`
-	Epochs          int     `yaml:"epochs"`
-	WarmupSteps     int     `yaml:"warmup_steps"`
-	SaveSteps       int     `yaml:"save_steps"`
+	ModelPath    string  `yaml:"model_path"`
+	TrainingData string  `yaml:"training_data"`
+	OutputPath   string  `yaml:"output_path"`
+	LoRAR        int     `yaml:"lora_r"`     // LoRA rank
+	LoRAAlpha    int     `yaml:"lora_alpha"` // LoRA alpha
+	BatchSize    int     `yaml:"batch_size"`
+	GradAccSteps int     `yaml:"grad_acc_steps"`
+	LearningRate float64 `yaml:"learning_rate"`
+	Epochs       int     `yaml:"epochs"`
+	WarmupSteps  int     `yaml:"warmup_steps"`
+	SaveSteps    int     `yaml:"save_steps"`
 }
 
 // TrainingExample represents a single training example
 type TrainingExample struct {
-	Input  string `json:"input"`
-	Output string `json:"output"`
+	Input  string  `json:"input"`
+	Output string  `json:"output"`
 	Score  float64 `json:"score,omitempty"` // For reinforcement learning
 }
 
@@ -62,7 +62,7 @@ func (lt *LoRATrainer) PrepareTrainingData(examples []TrainingExample, outputPat
 		entry := map[string]interface{}{
 			"text": fmt.Sprintf("### Instruction:\n%s\n\n### Response:\n%s", example.Input, example.Output),
 		}
-		
+
 		// Add reinforcement learning score if available
 		if example.Score > 0 {
 			entry["score"] = example.Score
@@ -175,25 +175,25 @@ func DefaultLoRAConfig() LoRAConfig {
 // ValidateLoRABinaries checks if required llama.cpp binaries exist
 func (lt *LoRATrainer) ValidateLoRABinaries() error {
 	binaries := []string{lt.llamaFinetunePath, lt.llamaExportPath}
-	
+
 	for _, binary := range binaries {
 		if _, err := os.Stat(binary); os.IsNotExist(err) {
 			return fmt.Errorf("required binary not found: %s", binary)
 		}
 	}
-	
+
 	return nil
 }
 
 // GetLoRAInfo returns information about available LoRA adapters
 func GetLoRAInfo(adapterDir string) ([]string, error) {
 	var adapters []string
-	
+
 	err := filepath.Walk(adapterDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if filepath.Ext(path) == ".bin" && info.Mode().IsRegular() {
 			relPath, err := filepath.Rel(adapterDir, path)
 			if err != nil {
@@ -201,13 +201,13 @@ func GetLoRAInfo(adapterDir string) ([]string, error) {
 			}
 			adapters = append(adapters, relPath)
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan LoRA adapter directory: %w", err)
 	}
-	
+
 	return adapters, nil
 }

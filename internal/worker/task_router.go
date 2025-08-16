@@ -38,7 +38,7 @@ func NewTaskRouter(localManager *localmodels.Manager, aiConfig *ai.AIHelperConfi
 // RouteTask determines the best execution strategy for a task
 func (tr *TaskRouter) RouteTask(ctx context.Context, task *types.WorkflowTask) (*TaskExecution, error) {
 	complexity := tr.analyzeTaskComplexity(task)
-	
+
 	switch complexity {
 	case ComplexitySimple:
 		return tr.routeToLocalModel(ctx, task)
@@ -59,48 +59,48 @@ func (tr *TaskRouter) RouteTask(ctx context.Context, task *types.WorkflowTask) (
 func (tr *TaskRouter) analyzeTaskComplexity(task *types.WorkflowTask) TaskComplexity {
 	taskType := strings.ToLower(task.Type)
 	content := strings.ToLower(fmt.Sprintf("%v", task.Payload))
-	
+
 	// High complexity indicators
 	highComplexityKeywords := []string{
-		"architecture", "design", "review", "security", "analysis", 
+		"architecture", "design", "review", "security", "analysis",
 		"refactor", "optimization", "performance", "complex", "comprehensive",
 		"strategy", "planning", "evaluation", "assessment",
 	}
-	
-	// Medium complexity indicators  
+
+	// Medium complexity indicators
 	mediumComplexityKeywords := []string{
 		"implement", "create", "generate", "modify", "update",
 		"integration", "testing", "validation", "debugging",
 	}
-	
+
 	// Simple task indicators (MCP/local model territory)
 	simpleTaskKeywords := []string{
 		"format", "lint", "syntax", "simple", "basic", "quick",
 		"echo", "status", "info", "list", "search", "read", "write",
 		"mcp", "tool", "file operation", "git operation",
 	}
-	
+
 	// Check for high complexity
 	for _, keyword := range highComplexityKeywords {
 		if strings.Contains(content, keyword) || strings.Contains(taskType, keyword) {
 			return ComplexityHigh
 		}
 	}
-	
+
 	// Check for simple tasks (MCP territory)
 	for _, keyword := range simpleTaskKeywords {
 		if strings.Contains(content, keyword) || strings.Contains(taskType, keyword) {
 			return ComplexitySimple
 		}
 	}
-	
+
 	// Check for medium complexity
 	for _, keyword := range mediumComplexityKeywords {
 		if strings.Contains(content, keyword) || strings.Contains(taskType, keyword) {
 			return ComplexityMedium
 		}
 	}
-	
+
 	// Default to medium complexity
 	return ComplexityMedium
 }
@@ -110,18 +110,18 @@ func (tr *TaskRouter) routeToLocalModel(ctx context.Context, task *types.Workflo
 	if tr.localModelManager == nil {
 		return nil, fmt.Errorf("local model manager not available")
 	}
-	
+
 	// Select appropriate local model based on task type
 	modelName := tr.selectLocalModel(task)
-	
+
 	execution := &TaskExecution{
-		Strategy:  ExecutionStrategyLocal,
-		ModelName: modelName,
-		Task:      task,
+		Strategy:   ExecutionStrategyLocal,
+		ModelName:  modelName,
+		Task:       task,
 		MCPEnabled: tr.mcpEnabled && tr.isMCPTask(task),
-		Reasoning: fmt.Sprintf("Task complexity: simple/medium, using local model %s", modelName),
+		Reasoning:  fmt.Sprintf("Task complexity: simple/medium, using local model %s", modelName),
 	}
-	
+
 	return execution, nil
 }
 
@@ -130,13 +130,13 @@ func (tr *TaskRouter) routeToExternalAPI(ctx context.Context, task *types.Workfl
 	if tr.aiConfig == nil {
 		return nil, fmt.Errorf("AI configuration not available")
 	}
-	
+
 	// Get preferred API based on complexity
 	provider, apiConfig, err := tr.aiConfig.GetPreferredAPI(complexity)
 	if err != nil {
 		return nil, fmt.Errorf("no suitable API found: %w", err)
 	}
-	
+
 	execution := &TaskExecution{
 		Strategy:    ExecutionStrategyAPI,
 		APIProvider: provider,
@@ -145,14 +145,14 @@ func (tr *TaskRouter) routeToExternalAPI(ctx context.Context, task *types.Workfl
 		MCPEnabled:  false, // External APIs don't use MCP directly
 		Reasoning:   fmt.Sprintf("Task complexity: %s, using %s API", complexity, provider),
 	}
-	
+
 	return execution, nil
 }
 
 // selectLocalModel chooses the best local model for a task
 func (tr *TaskRouter) selectLocalModel(task *types.WorkflowTask) string {
 	taskType := strings.ToLower(task.Type)
-	
+
 	// Task-specific model selection
 	switch {
 	case strings.Contains(taskType, "embed") || strings.Contains(taskType, "search"):
@@ -172,7 +172,7 @@ func (tr *TaskRouter) isMCPTask(task *types.WorkflowTask) bool {
 		"file", "git", "search", "read", "write", "list",
 		"directory", "repository", "database", "tool",
 	}
-	
+
 	content := strings.ToLower(fmt.Sprintf("%s %v", task.Type, task.Payload))
 	for _, keyword := range mcpKeywords {
 		if strings.Contains(content, keyword) {
@@ -219,18 +219,18 @@ func (te *TaskExecution) executeLocal(ctx context.Context, localManager *localmo
 	if localManager == nil {
 		return "", fmt.Errorf("local model manager not available")
 	}
-	
+
 	// Load model if needed
 	if err := localManager.LoadModel(ctx, te.ModelName); err != nil {
 		return "", fmt.Errorf("failed to load model %s: %w", te.ModelName, err)
 	}
-	
+
 	// Get model instance
 	model, err := localManager.GetModel(te.ModelName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get model %s: %w", te.ModelName, err)
 	}
-	
+
 	// Prepare input
 	prompt := te.buildLocalPrompt()
 	input := localmodels.ModelInput{
@@ -238,20 +238,20 @@ func (te *TaskExecution) executeLocal(ctx context.Context, localManager *localmo
 		Temperature: 0.7,
 		MaxTokens:   te.getMaxTokensForTask(),
 	}
-	
+
 	// Add MCP context if enabled
 	if te.MCPEnabled {
 		// MCP tools would be handled by the model implementation
 		// For now, just add MCP context to the prompt
 		input.Text = fmt.Sprintf("MCP Tools Available: %v\n\n%s", te.getRequiredMCPTools(), input.Text)
 	}
-	
+
 	// Execute
 	output, err := model.Predict(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("local model prediction failed: %w", err)
 	}
-	
+
 	return output.Text, nil
 }
 
@@ -260,30 +260,30 @@ func (te *TaskExecution) executeAPI(ctx context.Context, aiClient *ai.AIClient) 
 	if aiClient == nil {
 		return "", fmt.Errorf("AI client not available")
 	}
-	
+
 	// For now, return a placeholder since we need to implement the full AI client
 	// This would integrate with the AI helper scripts via MQTT
-	return fmt.Sprintf("API execution not yet implemented for provider: %s, model: %s, prompt: %s", 
+	return fmt.Sprintf("API execution not yet implemented for provider: %s, model: %s, prompt: %s",
 		te.APIProvider, te.APIConfig.Models[0], te.buildDetailedPrompt()), nil
 }
 
 // buildLocalPrompt creates a prompt optimized for local models
 func (te *TaskExecution) buildLocalPrompt() string {
 	var prompt strings.Builder
-	
+
 	// Keep it simple and direct for local models
 	prompt.WriteString(fmt.Sprintf("Task: %s\n", te.Task.Type))
-	
+
 	if te.Task.PreviousOutput != "" {
 		prompt.WriteString(fmt.Sprintf("Previous output: %s\n", te.Task.PreviousOutput))
 	}
-	
+
 	for key, value := range te.Task.Payload {
 		prompt.WriteString(fmt.Sprintf("%s: %v\n", key, value))
 	}
-	
+
 	prompt.WriteString("\nPlease provide a clear, concise response.")
-	
+
 	return prompt.String()
 }
 
@@ -293,21 +293,21 @@ func (te *TaskExecution) buildLocalPrompt() string {
 // buildDetailedPrompt creates a comprehensive prompt for API calls
 func (te *TaskExecution) buildDetailedPrompt() string {
 	var prompt strings.Builder
-	
+
 	prompt.WriteString(fmt.Sprintf("Task Type: %s\n", te.Task.Type))
 	prompt.WriteString(fmt.Sprintf("Required Role: %s\n\n", te.Task.RequiredRole))
-	
+
 	if te.Task.PreviousOutput != "" {
 		prompt.WriteString(fmt.Sprintf("Previous Output to Review/Improve:\n%s\n\n", te.Task.PreviousOutput))
 	}
-	
+
 	prompt.WriteString("Task Details:\n")
 	for key, value := range te.Task.Payload {
 		prompt.WriteString(fmt.Sprintf("- %s: %v\n", key, value))
 	}
-	
+
 	prompt.WriteString("\nPlease provide a comprehensive, high-quality response that demonstrates expertise in this domain.")
-	
+
 	return prompt.String()
 }
 
@@ -316,7 +316,7 @@ func (te *TaskExecution) getMaxTokensForTask() int {
 	if te.MCPEnabled {
 		return 1024 // Shorter responses for MCP tasks
 	}
-	
+
 	switch te.Task.Type {
 	case "echo", "status", "simple":
 		return 512
@@ -330,20 +330,20 @@ func (te *TaskExecution) getMaxTokensForTask() int {
 // getRequiredMCPTools returns MCP tools needed for the task
 func (te *TaskExecution) getRequiredMCPTools() []string {
 	var tools []string
-	
+
 	taskContent := strings.ToLower(fmt.Sprintf("%s %v", te.Task.Type, te.Task.Payload))
-	
+
 	if strings.Contains(taskContent, "file") || strings.Contains(taskContent, "read") || strings.Contains(taskContent, "write") {
 		tools = append(tools, "filesystem")
 	}
-	
+
 	if strings.Contains(taskContent, "git") || strings.Contains(taskContent, "repository") {
 		tools = append(tools, "git")
 	}
-	
+
 	if strings.Contains(taskContent, "search") || strings.Contains(taskContent, "query") {
 		tools = append(tools, "qdrant_search")
 	}
-	
+
 	return tools
 }

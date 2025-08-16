@@ -592,7 +592,7 @@ func handleExportTrainingData(service *RAGService, args []string) {
 		if len(doc.Content) < 50 {
 			continue
 		}
-		
+
 		// Apply minimum score filter (doc scoring would be implemented in real system)
 		docScore := 0.8 // Placeholder - in real system this would come from doc metadata
 		if docScore < minScore {
@@ -600,11 +600,11 @@ func handleExportTrainingData(service *RAGService, args []string) {
 		}
 
 		var trainingExample map[string]interface{}
-		
+
 		if format == "llama-finetune" {
 			// llama-finetune expects JSONL with 'text' field
 			trainingExample = map[string]interface{}{
-				"text": fmt.Sprintf("### Instruction:\nProvide coding guidance for: %s\n\n### Response:\n%s", 
+				"text": fmt.Sprintf("### Instruction:\nProvide coding guidance for: %s\n\n### Response:\n%s",
 					doc.Type, doc.Content),
 			}
 		} else {
