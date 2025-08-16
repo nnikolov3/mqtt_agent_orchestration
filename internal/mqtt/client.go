@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"sync"
 	"time"
@@ -27,6 +28,10 @@ type Client struct {
 	host      string
 	port      int
 	clientID  string
+	username  string
+	password  string
+	tlsConfig *tls.Config
+	useTLS    bool
 	client    pahomqtt.Client
 	connected bool
 	mu        sync.RWMutex
@@ -38,6 +43,10 @@ type ClientOptions struct {
 	ConnectTimeout       time.Duration
 	ReconnectBackoff     time.Duration
 	MaxReconnectInterval time.Duration
+	Username             string
+	Password             string
+	TLSConfig            *tls.Config
+	UseTLS               bool
 }
 
 // DefaultClientOptions returns sensible defaults
@@ -47,6 +56,7 @@ func DefaultClientOptions() ClientOptions {
 		ConnectTimeout:       10 * time.Second,
 		ReconnectBackoff:     1 * time.Second,
 		MaxReconnectInterval: 30 * time.Second,
+		UseTLS:               false, // Default to non-TLS for backward compatibility
 	}
 }
 
@@ -65,6 +75,19 @@ func NewClientWithID(host string, port int, clientID string) *Client {
 	}
 }
 
+// NewClientWithOptions creates a new MQTT client with full configuration
+func NewClientWithOptions(host string, port int, clientID string, opts ClientOptions) *Client {
+	return &Client{
+		host:      host,
+		port:      port,
+		clientID:  clientID,
+		username:  opts.Username,
+		password:  opts.Password,
+		tlsConfig: opts.TLSConfig,
+		useTLS:    opts.UseTLS,
+	}
+}
+
 // Connect establishes connection to MQTT broker
 func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Lock()
@@ -79,12 +102,26 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	// Create MQTT client options
 	clientOpts := pahomqtt.NewClientOptions()
-	clientOpts.AddBroker(fmt.Sprintf("tcp://%s:%d", c.host, c.port))
+
+	// Set protocol based on TLS configuration
+	protocol := "tcp"
+	if c.useTLS {
+		protocol = "ssl"
+		clientOpts.SetTLSConfig(c.tlsConfig)
+	}
+
+	clientOpts.AddBroker(fmt.Sprintf("%s://%s:%d", protocol, c.host, c.port))
 	clientOpts.SetClientID(c.clientID)
 	clientOpts.SetKeepAlive(opts.KeepAlive)
 	clientOpts.SetConnectTimeout(opts.ConnectTimeout)
 	clientOpts.SetAutoReconnect(true)
 	clientOpts.SetMaxReconnectInterval(opts.MaxReconnectInterval)
+
+	// Set authentication if provided
+	if c.username != "" {
+		clientOpts.SetUsername(c.username)
+		clientOpts.SetPassword(c.password)
+	}
 
 	// Connection lost handler
 	clientOpts.SetConnectionLostHandler(func(client pahomqtt.Client, err error) {

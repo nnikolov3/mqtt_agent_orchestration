@@ -34,10 +34,10 @@ if [[ -L "${BASH_SOURCE[0]}" ]]; then
     # Script is symlinked, find the real location
     REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
     REAL_DIR="$(dirname "$REAL_SCRIPT")"
-    CONFIG_FILE_GLOBAL="$REAL_DIR/claude_helpers.toml"
+    CONFIG_FILE_GLOBAL="$REAL_DIR/ai_helpers.toml"
 else
     # Script executed directly
-    CONFIG_FILE_GLOBAL="$SCRIPT_DIR/claude_helpers.toml"
+    CONFIG_FILE_GLOBAL="$SCRIPT_DIR/ai_helpers.toml"
 fi
 
 # Load configuration from TOML file

@@ -281,6 +281,7 @@ function main() {
     build_go_binary "role-worker" "./cmd/role-worker"
     build_go_binary "client" "./cmd/client"
     build_go_binary "rag-service" "./cmd/rag-service"
+    build_go_binary "embedding-worker" "./cmd/embedding-worker"
     
     log_info "Build completed successfully"
     log_info "Binaries available in: $BUILD_DIR_GLOBAL/"

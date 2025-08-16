@@ -7,10 +7,12 @@ import (
 	"hash/fnv"
 	"log"
 	"net"
-	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
 	"github.com/niko/mqtt-agent-orchestration/pkg/types"
 	"github.com/qdrant/go-client/qdrant"
 )
@@ -19,7 +21,11 @@ import (
 type Service struct {
 	client      *qdrant.Client
 	qdrantURL   string
-	collections map[string]string // collection name -> description
+	collections map[string]string                        // collection name -> description
+	mqttClient  *mqtt.Client                             // Long-lived MQTT client for embedding requests
+	pendingReqs map[string]chan *types.EmbeddingResponse // Request correlation map
+	mu          sync.RWMutex                             // Thread safety for pending requests
+	initialized bool                                     // Track if MQTT client is initialized
 }
 
 // NewService creates a new RAG service with proper IPv6/IPv4 dual-stack support
@@ -72,6 +78,7 @@ func NewService(qdrantBinary, qdrantURL string) (*Service, error) {
 			"code_examples":    "Code examples and patterns",
 			"book_expert":      "Technical book content and knowledge",
 		},
+		pendingReqs: make(map[string]chan *types.EmbeddingResponse),
 	}, nil
 }
 
@@ -262,45 +269,148 @@ func (s *Service) IsAvailable(ctx context.Context) bool {
 	return err == nil
 }
 
-// generateLocalEmbedding generates embeddings using local Qwen3-Embedding-4B model
-// Returns nil if the embedding model is unavailable - caller must handle this explicitly
+// initMQTT initializes the long-lived MQTT client for embedding requests
+// Following "Performance and Efficiency" - reuse connections instead of creating new ones
+func (s *Service) initMQTT(ctx context.Context) error {
+	if s.initialized {
+		return nil
+	}
+
+	// Create MQTT client with unique ID for this service
+	s.mqttClient = mqtt.NewClientWithID("localhost", 1883, "rag-service")
+
+	// Connect to MQTT broker with timeout
+	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := s.mqttClient.Connect(connectCtx); err != nil {
+		return fmt.Errorf("failed to connect to MQTT broker: %w", err)
+	}
+
+	// Subscribe to embedding responses once
+	if err := s.mqttClient.Subscribe(ctx, types.EmbeddingResponseTopic, s.handleEmbeddingResponse); err != nil {
+		return fmt.Errorf("failed to subscribe to embedding responses: %w", err)
+	}
+
+	s.initialized = true
+	log.Printf("MQTT client initialized for embedding requests")
+	return nil
+}
+
+// handleEmbeddingResponse routes embedding responses to waiting goroutines
+// Following "Thread Safety" - uses mutex for safe concurrent access
+func (s *Service) handleEmbeddingResponse(payload []byte) {
+	var resp types.EmbeddingResponse
+	if err := json.Unmarshal(payload, &resp); err != nil {
+		log.Printf("ERROR: Failed to unmarshal embedding response: %v", err)
+		return
+	}
+
+	// Thread-safe lookup of response channel
+	s.mu.RLock()
+	responseChan, exists := s.pendingReqs[resp.RequestID]
+	s.mu.RUnlock()
+
+	if exists {
+		// Send response with timeout to prevent blocking
+		select {
+		case responseChan <- &resp:
+			// Response delivered successfully
+		case <-time.After(100 * time.Millisecond):
+			log.Printf("WARNING: Response channel timeout for request %s", resp.RequestID)
+		}
+	} else {
+		log.Printf("WARNING: Received response for unknown request %s", resp.RequestID)
+	}
+}
+
+// generateLocalEmbedding generates embeddings using long-lived MQTT client
+// Following "Performance and Efficiency" - reuses connection and implements proper correlation
 func (s *Service) generateLocalEmbedding(text string) []float32 {
-	// Use llama-embedding binary with Qwen3-Embedding-4B model
-	// Following "Do more with less" - use existing llama-embedding binary from /home/niko/bin
-	
-	// Implementation using llama-embedding CLI for reliable embeddings
-	cmd := fmt.Sprintf(`/home/niko/bin/llama-embedding -m /data/models/Qwen3-Embedding-4B-Q8_0.gguf -p %q --embd-output-format json --embd-normalize 2`, text)
-	
-	// Execute embedding generation
-	output, err := exec.Command("sh", "-c", cmd).Output()
+	// Initialize MQTT client if not already done
+	if !s.initialized {
+		if err := s.initMQTT(context.Background()); err != nil {
+			log.Printf("ERROR: Failed to initialize MQTT client: %v", err)
+			return nil
+		}
+	}
+
+	// Create embedding request with unique ID
+	reqID := fmt.Sprintf("emb-%d", time.Now().UnixNano())
+	req := types.EmbeddingRequest{
+		Text:      text,
+		RequestID: reqID,
+	}
+
+	// Marshal request
+	payload, err := json.Marshal(req)
 	if err != nil {
-		log.Printf("Embedding generation failed: %v", err)
+		log.Printf("ERROR: Failed to marshal embedding request: %v", err)
 		return nil
 	}
-	
-	// Parse JSON response
-	var embeddingResponse struct {
-		Data []struct {
-			Embedding []float32 `json:"embedding"`
-		} `json:"data"`
-	}
-	
-	if err := json.Unmarshal(output, &embeddingResponse); err != nil {
-		log.Printf("Failed to parse embedding response: %v", err)
+
+	// Create response channel and register request
+	responseChan := make(chan *types.EmbeddingResponse, 1)
+
+	s.mu.Lock()
+	s.pendingReqs[reqID] = responseChan
+	s.mu.Unlock()
+
+	// Cleanup function to remove request from map
+	defer func() {
+		s.mu.Lock()
+		delete(s.pendingReqs, reqID)
+		s.mu.Unlock()
+		close(responseChan)
+	}()
+
+	// Publish embedding request with timeout
+	publishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := s.mqttClient.Publish(publishCtx, types.EmbeddingRequestTopic, payload); err != nil {
+		log.Printf("ERROR: Failed to publish embedding request: %v", err)
 		return nil
 	}
-	
-	if len(embeddingResponse.Data) == 0 {
-		log.Printf("No embedding data returned")
+
+	// Wait for response with timeout
+	select {
+	case resp := <-responseChan:
+		if resp.Error != "" {
+			log.Printf("ERROR: Embedding service error: %s", resp.Error)
+			return nil
+		}
+
+		if len(resp.Embedding) != 2560 {
+			log.Printf("WARNING: Expected 2560-dim embedding, got %d dimensions", len(resp.Embedding))
+		}
+
+		return resp.Embedding
+
+	case <-time.After(30 * time.Second):
+		log.Printf("ERROR: Embedding request timeout for request %s", reqID)
 		return nil
 	}
-	
-	embedding := embeddingResponse.Data[0].Embedding
-	if len(embedding) != 2560 {
-		log.Printf("Warning: Expected 2560-dim embedding, got %d dimensions", len(embedding))
+}
+
+// Close gracefully shuts down the RAG service
+// Following "Graceful Degradation" - clean shutdown of resources
+func (s *Service) Close() error {
+	if s.mqttClient != nil {
+		s.mqttClient.Disconnect()
+		log.Printf("MQTT client disconnected")
 	}
-	
-	return embedding
+
+	// Clear any pending requests
+	s.mu.Lock()
+	for reqID, ch := range s.pendingReqs {
+		close(ch)
+		delete(s.pendingReqs, reqID)
+	}
+	s.mu.Unlock()
+
+	log.Printf("RAG service shutdown complete")
+	return nil
 }
 
 // hashString creates a consistent hash for string values

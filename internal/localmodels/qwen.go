@@ -83,7 +83,7 @@ func (q *QwenTextModel) Predict(ctx context.Context, input ModelInput) (*ModelOu
 		}
 
 		// Wait for server to start
-		time.Sleep(10 * time.Second)
+		time.Sleep(60 * time.Second)
 	}
 
 	log.Printf("Qwen2.5-Omni-3B (Text): Making inference request")
