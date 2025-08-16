@@ -40,7 +40,7 @@ type Request struct {
 
 	// Request metadata
 	RequestID string    `json:"request_id"`
-	TenantID  string    `json:"tenant_id"`  // For cost tracking
+	TenantID  string    `json:"tenant_id"` // For cost tracking
 	CreatedAt time.Time `json:"created_at"`
 
 	// MQTT context
@@ -95,8 +95,8 @@ type ModelInfo struct {
 	PricePerKOutputTokens float64 `json:"price_per_k_output_tokens"`
 
 	// Technical limits
-	MaxTokens        int  `json:"max_tokens"`
-	SupportsImages   bool `json:"supports_images"`
+	MaxTokens         int  `json:"max_tokens"`
+	SupportsImages    bool `json:"supports_images"`
 	SupportsStreaming bool `json:"supports_streaming"`
 
 	// Resource requirements (for local models)
@@ -121,9 +121,9 @@ type ProviderConfig struct {
 	RateLimitPerMinute int `yaml:"rate_limit_per_minute"`
 
 	// Local model specific
-	BinaryPath  string            `yaml:"binary_path,omitempty"`
-	ModelPath   string            `yaml:"model_path,omitempty"`
-	Models      map[string]string `yaml:"models,omitempty"` // model_name -> file_path
+	BinaryPath string            `yaml:"binary_path,omitempty"`
+	ModelPath  string            `yaml:"model_path,omitempty"`
+	Models     map[string]string `yaml:"models,omitempty"` // model_name -> file_path
 
 	// Cost controls
 	MaxCostPerRequest float64 `yaml:"max_cost_per_request"`
@@ -136,10 +136,10 @@ type ManagerConfig struct {
 	Providers []ProviderConfig `yaml:"providers"`
 
 	// Fallback behavior
-	EnableFallback      bool          `yaml:"enable_fallback"`
-	FallbackTimeout     time.Duration `yaml:"fallback_timeout"`
-	MaxRetries          int           `yaml:"max_retries"`
-	RetryDelay          time.Duration `yaml:"retry_delay"`
+	EnableFallback  bool          `yaml:"enable_fallback"`
+	FallbackTimeout time.Duration `yaml:"fallback_timeout"`
+	MaxRetries      int           `yaml:"max_retries"`
+	RetryDelay      time.Duration `yaml:"retry_delay"`
 
 	// Cost tracking
 	EnableCostTracking bool   `yaml:"enable_cost_tracking"`
@@ -162,24 +162,24 @@ type CostEntry struct {
 	Provider  string    `json:"provider"`
 	Model     string    `json:"model"`
 	RequestID string    `json:"request_id"`
-	
+
 	InputTokens  int     `json:"input_tokens"`
 	OutputTokens int     `json:"output_tokens"`
 	CostUSD      float64 `json:"cost_usd"`
-	
+
 	Latency time.Duration `json:"latency"`
 	Success bool          `json:"success"`
 }
 
 // ProviderStats holds statistics for a provider
 type ProviderStats struct {
-	Name             string        `json:"name"`
-	IsAvailable      bool          `json:"is_available"`
-	RequestCount     int64         `json:"request_count"`
-	SuccessCount     int64         `json:"success_count"`
-	ErrorCount       int64         `json:"error_count"`
-	TotalCostUSD     float64       `json:"total_cost_usd"`
-	AverageLatency   time.Duration `json:"average_latency"`
-	LastRequestTime  time.Time     `json:"last_request_time"`
-	SupportedModels  []string      `json:"supported_models"`
+	Name            string        `json:"name"`
+	IsAvailable     bool          `json:"is_available"`
+	RequestCount    int64         `json:"request_count"`
+	SuccessCount    int64         `json:"success_count"`
+	ErrorCount      int64         `json:"error_count"`
+	TotalCostUSD    float64       `json:"total_cost_usd"`
+	AverageLatency  time.Duration `json:"average_latency"`
+	LastRequestTime time.Time     `json:"last_request_time"`
+	SupportedModels []string      `json:"supported_models"`
 }

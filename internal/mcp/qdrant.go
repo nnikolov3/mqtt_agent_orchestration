@@ -46,7 +46,7 @@ func (q *QdrantMCPClient) ListCollections(ctx context.Context) ([]string, error)
 			"limit": 100,
 		},
 	}
-	
+
 	result, err := q.client.ExecuteToolCall(ctx, toolCall)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list collections: %w", err)
@@ -95,9 +95,9 @@ func (q *QdrantMCPClient) UpsertPoints(ctx context.Context, collectionName strin
 		Parameters: map[string]interface{}{
 			"content": fmt.Sprintf("Upserted %d points to collection %s", len(points), collectionName),
 			"metadata": map[string]interface{}{
-				"type": "points_upsert",
+				"type":       "points_upsert",
 				"collection": collectionName,
-				"count": len(points),
+				"count":      len(points),
 			},
 		},
 	}

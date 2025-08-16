@@ -25,17 +25,25 @@ func NewService(qdrantBinary, qdrantURL string) (*Service, error) {
 	// Parse URL properly using Go's net package
 	var host string
 	var port int
-	
+
 	if qdrantURL == "" {
 		host = "localhost"
 		port = 6333
 	} else {
+		// Handle both URL formats: "http://localhost:6333" and "localhost:6333"
+		cleanURL := qdrantURL
+		if strings.HasPrefix(qdrantURL, "http://") {
+			cleanURL = strings.TrimPrefix(qdrantURL, "http://")
+		} else if strings.HasPrefix(qdrantURL, "https://") {
+			cleanURL = strings.TrimPrefix(qdrantURL, "https://")
+		}
+
 		// Use Go's standard library for robust URL parsing
-		parsedHost, portStr, err := net.SplitHostPort(qdrantURL)
+		parsedHost, portStr, err := net.SplitHostPort(cleanURL)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Qdrant URL '%s': %v", qdrantURL, err)
 		}
-		
+
 		host = parsedHost
 		port, err = strconv.Atoi(portStr)
 		if err != nil {
@@ -57,7 +65,7 @@ func NewService(qdrantBinary, qdrantURL string) (*Service, error) {
 		qdrantURL: qdrantURL,
 		collections: map[string]string{
 			"agent_prompts":    "System prompts for each worker role",
-			"coding_standards": "Best practices and coding standards", 
+			"coding_standards": "Best practices and coding standards",
 			"documentation":    "Technical documentation and guides",
 			"code_examples":    "Code examples and patterns",
 			"book_expert":      "Technical book content and knowledge",
@@ -69,7 +77,7 @@ func NewService(qdrantBinary, qdrantURL string) (*Service, error) {
 func (s *Service) InitializeCollections(ctx context.Context) error {
 	// Qwen3-Embedding-4B produces 2560-dimensional vectors - use consistent dimensions
 	const vectorDimension = 2560
-	
+
 	// Create agent_prompts collection for system prompts
 	collectionName := "agent_prompts"
 	err := s.client.CreateCollection(ctx, &qdrant.CreateCollection{
@@ -214,7 +222,6 @@ func (s *Service) SearchKnowledge(ctx context.Context, query types.RAGQuery) (*t
 	return response, nil
 }
 
-
 // GetRelevantContext gets context for a specific task type
 func (s *Service) GetRelevantContext(ctx context.Context, taskType, content string) (string, error) {
 	query := types.RAGQuery{
@@ -260,7 +267,7 @@ func (s *Service) generateLocalEmbedding(text string) []float32 {
 	// Following "Do more with less" - use existing llama-server binary
 	// Real implementation would start llama-server, make HTTP call, parse response
 	// TODO: Implement actual embedding generation using /home/niko/bin/llama-server
-	
+
 	return nil
 }
 
@@ -270,4 +277,3 @@ func hashString(s string) uint32 {
 	h.Write([]byte(s))
 	return h.Sum32()
 }
-

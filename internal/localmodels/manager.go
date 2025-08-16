@@ -20,19 +20,19 @@ type LRUEntry struct {
 
 // Manager manages local models with GPU memory constraints and LRU eviction
 type Manager struct {
-	mu               sync.RWMutex
-	models           map[string]Model
-	modelConfigs     map[string]ModelConfig
-	gpuMemory        GPUMemoryInfo
-	maxGPUMemory     uint64
-	nvidiaSMIPath    string
-	monitorInterval  time.Duration
-	stopMonitoring   chan struct{}
-	
+	mu              sync.RWMutex
+	models          map[string]Model
+	modelConfigs    map[string]ModelConfig
+	gpuMemory       GPUMemoryInfo
+	maxGPUMemory    uint64
+	nvidiaSMIPath   string
+	monitorInterval time.Duration
+	stopMonitoring  chan struct{}
+
 	// LRU cache management
-	lruList          *list.List
-	lruMap           map[string]*list.Element
-	maxLoadedModels  int
+	lruList         *list.List
+	lruMap          map[string]*list.Element
+	maxLoadedModels int
 }
 
 // NewManager creates a new local model manager
@@ -44,7 +44,7 @@ func NewManager(config ModelManagerConfig) (*Manager, error) {
 		nvidiaSMIPath:   config.NvidiaSMIPath,
 		monitorInterval: config.MonitorInterval,
 		stopMonitoring:  make(chan struct{}),
-		
+
 		// LRU cache initialization
 		lruList:         list.New(),
 		lruMap:          make(map[string]*list.Element),
@@ -85,7 +85,7 @@ func (m *Manager) LoadModel(ctx context.Context, modelName string) error {
 	if !m.canLoadModel(config) {
 		// Try to free memory by evicting LRU models
 		if err := m.evictLRUModels(ctx, config.MemoryLimit); err != nil {
-			return fmt.Errorf("insufficient GPU memory to load model %s (requires ~%dMB, available: %dMB): %w", 
+			return fmt.Errorf("insufficient GPU memory to load model %s (requires ~%dMB, available: %dMB): %w",
 				modelName, config.MemoryLimit, m.gpuMemory.Free, err)
 		}
 	}
@@ -119,10 +119,10 @@ func (m *Manager) LoadModel(ctx context.Context, modelName string) error {
 	}
 
 	m.models[modelName] = model
-	
+
 	// Add to LRU cache
 	m.addToLRU(modelName)
-	
+
 	log.Printf("✅ Model %s loaded successfully", modelName)
 	return nil
 }
@@ -142,10 +142,10 @@ func (m *Manager) UnloadModel(ctx context.Context, modelName string) error {
 	}
 
 	delete(m.models, modelName)
-	
+
 	// Remove from LRU cache
 	m.removeFromLRU(modelName)
-	
+
 	log.Printf("✅ Model %s unloaded successfully", modelName)
 	return nil
 }
@@ -195,7 +195,7 @@ func (m *Manager) GetModelStatus() map[string]ModelStatus {
 	defer m.mu.RUnlock()
 
 	status := make(map[string]ModelStatus)
-	
+
 	for name := range m.modelConfigs {
 		modelStatus := ModelStatus{
 			Name:        name,
@@ -238,7 +238,7 @@ func (m *Manager) monitorGPUMemory() {
 
 			// Check if memory usage is critical
 			if m.gpuMemory.Used > m.maxGPUMemory {
-				log.Printf("🚨 GPU memory usage critical: %dMB used, %dMB max", 
+				log.Printf("🚨 GPU memory usage critical: %dMB used, %dMB max",
 					m.gpuMemory.Used, m.maxGPUMemory)
 				m.handleMemoryPressure()
 			}
@@ -251,10 +251,10 @@ func (m *Manager) monitorGPUMemory() {
 
 // updateGPUMemoryInfo updates GPU memory information using nvidia-smi
 func (m *Manager) updateGPUMemoryInfo() error {
-	cmd := exec.Command(m.nvidiaSMIPath, 
-		"--query-gpu=memory.total,memory.used,memory.free", 
+	cmd := exec.Command(m.nvidiaSMIPath,
+		"--query-gpu=memory.total,memory.used,memory.free",
 		"--format=csv,noheader,nounits")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("nvidia-smi execution failed: %w, output: %s", err, string(output))
@@ -339,12 +339,12 @@ func (m *Manager) handleMemoryPressure() {
 // addToLRU adds a model to the LRU cache
 func (m *Manager) addToLRU(modelName string) {
 	now := time.Now()
-	
+
 	// Remove if already exists
 	if elem, exists := m.lruMap[modelName]; exists {
 		m.lruList.Remove(elem)
 	}
-	
+
 	// Add to front
 	entry := &LRUEntry{
 		modelName: modelName,
@@ -352,7 +352,7 @@ func (m *Manager) addToLRU(modelName string) {
 	}
 	elem := m.lruList.PushFront(entry)
 	m.lruMap[modelName] = elem
-	
+
 	// Enforce max loaded models limit
 	for m.lruList.Len() > m.maxLoadedModels {
 		m.evictOldest()
@@ -381,12 +381,12 @@ func (m *Manager) getLRUModel() string {
 	if m.lruList.Len() == 0 {
 		return ""
 	}
-	
+
 	back := m.lruList.Back()
 	if back == nil {
 		return ""
 	}
-	
+
 	entry := back.Value.(*LRUEntry)
 	return entry.modelName
 }
@@ -397,11 +397,11 @@ func (m *Manager) evictOldest() {
 	if oldestModel == "" {
 		return
 	}
-	
+
 	// Unload the model
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	if model, exists := m.models[oldestModel]; exists {
 		if err := model.Unload(ctx); err != nil {
 			log.Printf("Failed to unload LRU model %s: %v", oldestModel, err)
@@ -409,7 +409,7 @@ func (m *Manager) evictOldest() {
 		}
 		delete(m.models, oldestModel)
 	}
-	
+
 	m.removeFromLRU(oldestModel)
 	log.Printf("✅ Evicted LRU model %s to enforce cache limits", oldestModel)
 }
@@ -417,39 +417,39 @@ func (m *Manager) evictOldest() {
 // evictLRUModels evicts LRU models to free the required memory
 func (m *Manager) evictLRUModels(ctx context.Context, requiredMemory uint64) error {
 	freedMemory := uint64(0)
-	
+
 	for freedMemory < requiredMemory && m.lruList.Len() > 0 {
 		oldestModel := m.getLRUModel()
 		if oldestModel == "" {
 			break
 		}
-		
+
 		// Get model memory usage before unloading
 		if model, exists := m.models[oldestModel]; exists {
 			modelMemory := model.GetMemoryUsage()
-			
+
 			if err := model.Unload(ctx); err != nil {
 				log.Printf("Failed to unload LRU model %s: %v", oldestModel, err)
 				continue
 			}
-			
+
 			delete(m.models, oldestModel)
 			m.removeFromLRU(oldestModel)
 			freedMemory += modelMemory
-			
+
 			log.Printf("✅ Evicted LRU model %s, freed %dMB", oldestModel, modelMemory)
 		}
 	}
-	
+
 	// Update GPU memory info
 	if err := m.updateGPUMemoryInfo(); err != nil {
 		log.Printf("Warning: Failed to update GPU memory after eviction: %v", err)
 	}
-	
+
 	if freedMemory < requiredMemory {
 		return fmt.Errorf("could not free enough memory: freed %dMB, required %dMB", freedMemory, requiredMemory)
 	}
-	
+
 	return nil
 }
 
@@ -463,7 +463,7 @@ func (m *Manager) GetGPUMemoryInfo() GPUMemoryInfo {
 // Shutdown gracefully shuts down the model manager
 func (m *Manager) Shutdown(ctx context.Context) error {
 	log.Printf("Shutting down local model manager...")
-	
+
 	// Stop monitoring
 	close(m.stopMonitoring)
 

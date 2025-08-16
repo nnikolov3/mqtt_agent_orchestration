@@ -112,7 +112,7 @@ func (c *AIClient) generateWithProvider(ctx context.Context, provider string, ap
 		}
 
 		lastErr = err
-		
+
 		// Try next model in the list
 		if len(apiConfig.Models) > attempt+1 {
 			continue
@@ -130,7 +130,7 @@ func (c *AIClient) callAPI(ctx context.Context, provider string, apiConfig APICo
 	}
 
 	model := apiConfig.Models[0]
-	
+
 	// Create request
 	request := ChatRequest{
 		Model:       model,
@@ -160,7 +160,7 @@ func (c *AIClient) callAPI(ctx context.Context, provider string, apiConfig APICo
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	apiKey := apiConfig.GetAPIKey()
 	if apiKey == "" {
 		return "", fmt.Errorf("API key not found for provider %s", provider)

@@ -34,9 +34,9 @@ type Client struct {
 
 // ClientOptions configures MQTT client behavior
 type ClientOptions struct {
-	KeepAlive        time.Duration
-	ConnectTimeout   time.Duration
-	ReconnectBackoff time.Duration
+	KeepAlive            time.Duration
+	ConnectTimeout       time.Duration
+	ReconnectBackoff     time.Duration
 	MaxReconnectInterval time.Duration
 }
 
@@ -76,7 +76,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	opts := DefaultClientOptions()
-	
+
 	// Create MQTT client options
 	clientOpts := pahomqtt.NewClientOptions()
 	clientOpts.AddBroker(fmt.Sprintf("tcp://%s:%d", c.host, c.port))
@@ -85,14 +85,14 @@ func (c *Client) Connect(ctx context.Context) error {
 	clientOpts.SetConnectTimeout(opts.ConnectTimeout)
 	clientOpts.SetAutoReconnect(true)
 	clientOpts.SetMaxReconnectInterval(opts.MaxReconnectInterval)
-	
+
 	// Connection lost handler
 	clientOpts.SetConnectionLostHandler(func(client pahomqtt.Client, err error) {
 		c.mu.Lock()
 		c.connected = false
 		c.mu.Unlock()
 	})
-	
+
 	// On connect handler
 	clientOpts.SetOnConnectHandler(func(client pahomqtt.Client) {
 		c.mu.Lock()
@@ -101,7 +101,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	})
 
 	c.client = pahomqtt.NewClient(clientOpts)
-	
+
 	// Connect with context timeout
 	done := make(chan error, 1)
 	go func() {
@@ -109,7 +109,7 @@ func (c *Client) Connect(ctx context.Context) error {
 		token.Wait()
 		done <- token.Error()
 	}()
-	
+
 	select {
 	case err := <-done:
 		if err != nil {
@@ -126,7 +126,7 @@ func (c *Client) Connect(ctx context.Context) error {
 func (c *Client) Disconnect() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.client != nil && c.client.IsConnected() {
 		c.client.Disconnect(250) // 250ms timeout for graceful disconnect
 	}
@@ -137,7 +137,7 @@ func (c *Client) Disconnect() {
 func (c *Client) IsConnected() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	return c.connected && c.client != nil && c.client.IsConnected()
 }
 
@@ -146,18 +146,18 @@ func (c *Client) Publish(ctx context.Context, topic string, payload []byte) erro
 	if !c.IsConnected() {
 		return fmt.Errorf("client not connected")
 	}
-	
+
 	// Use QoS 1 for reliable delivery
 	const qos = 1
 	const retained = false
-	
+
 	done := make(chan error, 1)
 	go func() {
 		token := c.client.Publish(topic, qos, retained, payload)
 		token.Wait()
 		done <- token.Error()
 	}()
-	
+
 	select {
 	case err := <-done:
 		if err != nil {
@@ -174,21 +174,21 @@ func (c *Client) Subscribe(ctx context.Context, topic string, handler MessageHan
 	if !c.IsConnected() {
 		return fmt.Errorf("client not connected")
 	}
-	
+
 	// Use QoS 1 for reliable delivery
 	const qos = 1
-	
+
 	messageHandler := func(client pahomqtt.Client, msg pahomqtt.Message) {
 		handler(msg.Payload())
 	}
-	
+
 	done := make(chan error, 1)
 	go func() {
 		token := c.client.Subscribe(topic, qos, messageHandler)
 		token.Wait()
 		done <- token.Error()
 	}()
-	
+
 	select {
 	case err := <-done:
 		if err != nil {
@@ -205,14 +205,14 @@ func (c *Client) Unsubscribe(ctx context.Context, topic string) error {
 	if !c.IsConnected() {
 		return fmt.Errorf("client not connected")
 	}
-	
+
 	done := make(chan error, 1)
 	go func() {
 		token := c.client.Unsubscribe(topic)
 		token.Wait()
 		done <- token.Error()
 	}()
-	
+
 	select {
 	case err := <-done:
 		if err != nil {

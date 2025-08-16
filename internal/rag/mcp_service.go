@@ -18,9 +18,9 @@ type MCPService struct {
 
 // MCPServiceConfig holds MCP service configuration
 type MCPServiceConfig struct {
-	QdrantURL string        `json:"qdrant_url"`
-	Timeout   time.Duration `json:"timeout"`
-	MaxRetries int          `json:"max_retries"`
+	QdrantURL  string        `json:"qdrant_url"`
+	Timeout    time.Duration `json:"timeout"`
+	MaxRetries int           `json:"max_retries"`
 	RetryDelay time.Duration `json:"retry_delay"`
 }
 

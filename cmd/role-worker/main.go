@@ -23,7 +23,7 @@ import (
 const (
 	DefaultMQTTHost      = "localhost"
 	DefaultMQTTPort      = 1883
-	DefaultQdrantURL     = "http://localhost:6333"
+	DefaultQdrantURL     = "localhost:6333"
 	StatusUpdateInterval = 30 * time.Second
 	TaskTimeout          = 10 * time.Minute
 )

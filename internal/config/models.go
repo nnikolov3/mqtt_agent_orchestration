@@ -19,9 +19,9 @@ type ModelConfig struct {
 
 // ManagerConfig holds manager-level configuration
 type ManagerConfig struct {
-	MaxGPUMemory     uint64        `yaml:"max_gpu_memory"`
-	NvidiaSMIPath    string        `yaml:"nvidia_smi_path"`
-	MonitorInterval  time.Duration `yaml:"monitor_interval"`
+	MaxGPUMemory    uint64        `yaml:"max_gpu_memory"`
+	NvidiaSMIPath   string        `yaml:"nvidia_smi_path"`
+	MonitorInterval time.Duration `yaml:"monitor_interval"`
 }
 
 // FallbackConfig holds fallback configuration
@@ -34,10 +34,10 @@ type FallbackConfig struct {
 
 // PerformanceConfig holds performance-related settings
 type PerformanceConfig struct {
-	EnableBatching      bool   `yaml:"enable_batching"`
-	MaxBatchSize        int    `yaml:"max_batch_size"`
-	EnableContextReuse  bool   `yaml:"enable_context_reuse"`
-	MaxContextAge       string `yaml:"max_context_age"`
+	EnableBatching     bool   `yaml:"enable_batching"`
+	MaxBatchSize       int    `yaml:"max_batch_size"`
+	EnableContextReuse bool   `yaml:"enable_context_reuse"`
+	MaxContextAge      string `yaml:"max_context_age"`
 }
 
 // LoadModelConfig loads model configuration from a YAML file
@@ -46,24 +46,24 @@ func LoadModelConfig(configPath string) (*ModelConfig, error) {
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("model configuration file not found: %s", configPath)
 	}
-	
+
 	// Read configuration file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read model configuration: %w", err)
 	}
-	
+
 	// Parse YAML
 	var config ModelConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse model configuration: %w", err)
 	}
-	
+
 	// Validate configuration
 	if err := validateModelConfig(&config); err != nil {
 		return nil, fmt.Errorf("invalid model configuration: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -73,33 +73,33 @@ func validateModelConfig(config *ModelConfig) error {
 	if len(config.Models) == 0 {
 		return fmt.Errorf("no models defined in configuration")
 	}
-	
+
 	// Validate each model configuration
 	for name, modelConfig := range config.Models {
 		if err := validateModelConfigEntry(name, modelConfig); err != nil {
 			return err
 		}
 	}
-	
+
 	// Validate manager configuration
 	if config.Manager.MaxGPUMemory == 0 {
 		return fmt.Errorf("max_gpu_memory must be greater than 0")
 	}
-	
+
 	if config.Manager.MonitorInterval == 0 {
 		config.Manager.MonitorInterval = 30 * time.Second // Default value
 	}
-	
+
 	// Validate fallback configuration
 	if config.Fallback.MaxRetries < 0 {
 		return fmt.Errorf("max_retries must be non-negative")
 	}
-	
+
 	// Validate performance configuration
 	if config.Performance.MaxBatchSize <= 0 {
 		config.Performance.MaxBatchSize = 4 // Default value
 	}
-	
+
 	return nil
 }
 
@@ -108,24 +108,24 @@ func validateModelConfigEntry(name string, config localmodels.ModelConfig) error
 	if config.Name == "" {
 		return fmt.Errorf("model %s: name is required", name)
 	}
-	
+
 	if config.ModelPath == "" {
 		return fmt.Errorf("model %s: model_path is required", name)
 	}
-	
+
 	if config.Type == "" {
 		return fmt.Errorf("model %s: type is required", name)
 	}
-	
+
 	if config.MemoryLimit == 0 {
 		return fmt.Errorf("model %s: memory_limit must be greater than 0", name)
 	}
-	
+
 	// Check if model file exists
 	if _, err := os.Stat(config.ModelPath); os.IsNotExist(err) {
 		return fmt.Errorf("model %s: model file not found: %s", name, config.ModelPath)
 	}
-	
+
 	return nil
 }
 

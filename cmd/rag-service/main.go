@@ -51,7 +51,7 @@ func main() {
 	}
 
 	service := &RAGService{client: client}
-	
+
 	// Initialize collection
 	err = service.initializeCollection()
 	if err != nil {
@@ -81,7 +81,7 @@ func main() {
 
 func (r *RAGService) initializeCollection() error {
 	ctx := context.Background()
-	
+
 	// Create collection
 	err := r.client.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: CollectionName,
@@ -90,55 +90,55 @@ func (r *RAGService) initializeCollection() error {
 			Distance: qdrant.Distance_Cosine,
 		}),
 	})
-	
+
 	// Collection might already exist - that's ok
 	return err
 }
 
 func (r *RAGService) storeDocument(doc Document) error {
 	ctx := context.Background()
-	
+
 	// Generate real embedding using Qwen3 model
 	embedding, err := generateEmbedding(doc.Content)
 	if err != nil {
 		return fmt.Errorf("failed to generate embedding: %w", err)
 	}
-	
+
 	// Create point
 	payload := map[string]any{
 		"content": doc.Content,
 		"type":    doc.Type,
 		"source":  doc.Source,
 	}
-	
+
 	// Add metadata fields individually
 	for k, v := range doc.Metadata {
 		payload["meta_"+k] = v
 	}
-	
+
 	point := &qdrant.PointStruct{
 		Id:      qdrant.NewIDNum(hashString(doc.ID)),
 		Vectors: qdrant.NewVectors(embedding...),
 		Payload: qdrant.NewValueMap(payload),
 	}
-	
+
 	_, err2 := r.client.Upsert(ctx, &qdrant.UpsertPoints{
 		CollectionName: CollectionName,
 		Points:         []*qdrant.PointStruct{point},
 	})
-	
+
 	return err2
 }
 
 func (r *RAGService) searchDocuments(query string, limit int) ([]Document, error) {
 	ctx := context.Background()
-	
+
 	// Generate embedding for query
 	queryEmbedding, err := generateEmbedding(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
-	
+
 	// Search
 	searchResult, err := r.client.Query(ctx, &qdrant.QueryPoints{
 		CollectionName: CollectionName,
@@ -146,18 +146,18 @@ func (r *RAGService) searchDocuments(query string, limit int) ([]Document, error
 		Limit:          qdrant.PtrOf(uint64(limit)),
 		WithPayload:    qdrant.NewWithPayload(true),
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var docs []Document
 	for _, point := range searchResult {
 		doc := Document{
 			ID:       fmt.Sprintf("%d", point.Id.GetNum()),
 			Metadata: make(map[string]string),
 		}
-		
+
 		if point.Payload != nil {
 			if content, ok := point.Payload["content"]; ok {
 				if strVal, ok := content.GetKind().(*qdrant.Value_StringValue); ok {
@@ -175,10 +175,10 @@ func (r *RAGService) searchDocuments(query string, limit int) ([]Document, error
 				}
 			}
 		}
-		
+
 		docs = append(docs, doc)
 	}
-	
+
 	return docs, nil
 }
 
@@ -187,7 +187,7 @@ func handleRegister(service *RAGService, args []string) {
 		fmt.Println("Usage: rag-service register <project> <path> <technologies>")
 		os.Exit(1)
 	}
-	
+
 	doc := Document{
 		ID:      fmt.Sprintf("project_%s", args[0]),
 		Content: fmt.Sprintf("Project: %s, Path: %s, Technologies: %s", args[0], args[1], args[2]),
@@ -200,28 +200,28 @@ func handleRegister(service *RAGService, args []string) {
 			"created_at":   time.Now().Format(time.RFC3339),
 		},
 	}
-	
+
 	err := service.storeDocument(doc)
 	if err != nil {
 		log.Fatalf("Failed to register project: %v", err)
 	}
-	
+
 	fmt.Printf("Registered project: %s\n", args[0])
 }
 
 func handleStoreStandards(service *RAGService, args []string) {
-	
+
 	// Read Claude standards
 	claudeStandards, err := os.ReadFile("/home/niko/.claude/CLAUDE.md")
 	if err != nil {
 		log.Fatalf("Failed to read Claude standards: %v", err)
 	}
-	
+
 	bashStandards, err := os.ReadFile("/home/niko/.claude/BASH_CODING_STANDARD_CLAUDE.md")
 	if err != nil {
 		log.Fatalf("Failed to read Bash standards: %v", err)
 	}
-	
+
 	// Store Claude guidelines
 	claudeDoc := Document{
 		ID:      "claude_guidelines",
@@ -229,12 +229,12 @@ func handleStoreStandards(service *RAGService, args []string) {
 		Type:    "coding_standards",
 		Source:  "claude_system",
 		Metadata: map[string]string{
-			"language":    "general",
-			"category":    "guidelines",
+			"language":   "general",
+			"category":   "guidelines",
 			"importance": "critical",
 		},
 	}
-	
+
 	// Store Bash standards
 	bashDoc := Document{
 		ID:      "bash_standards",
@@ -242,22 +242,22 @@ func handleStoreStandards(service *RAGService, args []string) {
 		Type:    "coding_standards",
 		Source:  "claude_system",
 		Metadata: map[string]string{
-			"language":    "bash",
-			"category":    "standards",
+			"language":   "bash",
+			"category":   "standards",
 			"importance": "critical",
 		},
 	}
-	
+
 	err = service.storeDocument(claudeDoc)
 	if err != nil {
 		log.Fatalf("Failed to store Claude standards: %v", err)
 	}
-	
+
 	err = service.storeDocument(bashDoc)
 	if err != nil {
 		log.Fatalf("Failed to store Bash standards: %v", err)
 	}
-	
+
 	fmt.Println("Stored Claude and Bash coding standards in Qdrant")
 }
 
@@ -266,13 +266,13 @@ func handleSearch(service *RAGService, args []string) {
 		fmt.Println("Usage: rag-service search <query>")
 		os.Exit(1)
 	}
-	
+
 	query := strings.Join(args, " ")
 	docs, err := service.searchDocuments(query, 5)
 	if err != nil {
 		log.Fatalf("Search failed: %v", err)
 	}
-	
+
 	fmt.Printf("Search results for '%s':\n\n", query)
 	for i, doc := range docs {
 		fmt.Printf("%d. Type: %s, Source: %s\n", i+1, doc.Type, doc.Source)
@@ -286,13 +286,13 @@ func handleContext(service *RAGService, args []string) {
 		fmt.Println("Usage: rag-service context <project> <type> <query>")
 		os.Exit(1)
 	}
-	
+
 	query := fmt.Sprintf("%s %s %s", args[0], args[1], args[2])
 	docs, err := service.searchDocuments(query, 3)
 	if err != nil {
 		log.Fatalf("Context search failed: %v", err)
 	}
-	
+
 	fmt.Printf("Context for project '%s' (%s): %s\n\n", args[0], args[1], args[2])
 	for _, doc := range docs {
 		fmt.Printf("- %s\n", truncate(doc.Content, 150))
@@ -304,7 +304,7 @@ func handleListProjects(service *RAGService) {
 	if err != nil {
 		log.Fatalf("Failed to list projects: %v", err)
 	}
-	
+
 	fmt.Println("Registered projects:")
 	for _, doc := range docs {
 		if doc.Type == "project" {
@@ -316,29 +316,29 @@ func handleListProjects(service *RAGService) {
 // Helper functions
 func generateEmbedding(text string) ([]float32, error) {
 	// Use llama-embedding binary with Qwen3 model
-	cmd := exec.Command(LlamaEmbeddingBin, 
+	cmd := exec.Command(LlamaEmbeddingBin,
 		"-m", EmbeddingModel,
 		"-p", text,
 		"--embedding")
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("Embedding generation failed: %v", err)
 		// Fallback to simple embedding
 		return generateSimpleEmbedding(text), nil
 	}
-	
+
 	// Parse the embedding output
 	lines := strings.Split(string(output), "\n")
 	var embedding []float32
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			// Remove brackets and split by spaces/commas
 			line = strings.Trim(line, "[]")
 			values := strings.Fields(strings.ReplaceAll(line, ",", " "))
-			
+
 			for _, val := range values {
 				if f, err := strconv.ParseFloat(val, 32); err == nil {
 					embedding = append(embedding, float32(f))
@@ -347,27 +347,27 @@ func generateEmbedding(text string) ([]float32, error) {
 			break
 		}
 	}
-	
+
 	if len(embedding) == 0 {
 		// Fallback if parsing fails
 		return generateSimpleEmbedding(text), nil
 	}
-	
+
 	return embedding, nil
 }
 
 func generateSimpleEmbedding(text string) []float32 {
 	// Fallback hash-based embedding
 	embedding := make([]float32, EmbeddingDim)
-	
+
 	hash := 0
 	for i, char := range text {
 		hash = hash*31 + int(char)
 		if i < len(embedding) {
-			embedding[i] = float32((hash % 200) - 100) / 100.0
+			embedding[i] = float32((hash%200)-100) / 100.0
 		}
 	}
-	
+
 	// Simple normalization
 	var magnitude float32
 	for _, val := range embedding {
@@ -379,7 +379,7 @@ func generateSimpleEmbedding(text string) []float32 {
 			embedding[i] *= magnitude
 		}
 	}
-	
+
 	return embedding
 }
 

@@ -19,14 +19,14 @@ import (
 
 // Configuration constants - following "Never hard code values" principle
 const (
-	DefaultMQTTHost          = "localhost"
-	DefaultMQTTPort          = 1883
-	DefaultWorkerID          = "worker-1"
-	TaskTopic                = "tasks/new"
-	ResultTopic              = "tasks/results"
-	StatusTopic              = "workers/status"
-	StatusUpdateInterval     = 30 * time.Second
-	TaskTimeout              = 5 * time.Minute
+	DefaultMQTTHost      = "localhost"
+	DefaultMQTTPort      = 1883
+	DefaultWorkerID      = "worker-1"
+	TaskTopic            = "tasks/new"
+	ResultTopic          = "tasks/results"
+	StatusTopic          = "workers/status"
+	StatusUpdateInterval = 30 * time.Second
+	TaskTimeout          = 5 * time.Minute
 )
 
 // SimpleTaskProcessor implements basic task processing for testing
@@ -40,19 +40,19 @@ func (p *SimpleTaskProcessor) ProcessTask(ctx context.Context, task types.Task) 
 			return fmt.Sprintf("Echo: %s", message), nil
 		}
 		return "Echo: (no message)", nil
-		
+
 	case "uppercase":
 		if text, ok := task.Payload["text"]; ok {
 			return fmt.Sprintf("UPPERCASE: %s", text), nil
 		}
 		return "UPPERCASE: (no text)", nil
-		
+
 	case "ai_helper":
 		return p.processAIHelperTask(ctx, task)
-		
+
 	case "create_document":
 		return p.processCreateDocumentTask(ctx, task)
-		
+
 	default:
 		return "", fmt.Errorf("unknown task type: %s", task.Type)
 	}
@@ -64,19 +64,19 @@ func (p *SimpleTaskProcessor) processAIHelperTask(ctx context.Context, task type
 	if !ok {
 		return "", fmt.Errorf("missing 'helper' in task payload")
 	}
-	
+
 	prompt, ok := task.Payload["prompt"]
 	if !ok {
 		return "", fmt.Errorf("missing 'prompt' in task payload")
 	}
-	
+
 	// Execute AI helper command
 	cmd := exec.CommandContext(ctx, helperName, prompt)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("AI helper %s failed: %w", helperName, err)
 	}
-	
+
 	return string(output), nil
 }
 
@@ -86,12 +86,12 @@ func (p *SimpleTaskProcessor) processCreateDocumentTask(ctx context.Context, tas
 	if !ok {
 		return "", fmt.Errorf("missing 'document_type' in task payload")
 	}
-	
+
 	outputFile, ok := task.Payload["output_file"]
 	if !ok {
 		return "", fmt.Errorf("missing 'output_file' in task payload")
 	}
-	
+
 	switch documentType {
 	case "go_coding_standards":
 		return p.createGoCodingStandards(ctx, outputFile, task.Payload)
@@ -104,7 +104,7 @@ func (p *SimpleTaskProcessor) processCreateDocumentTask(ctx context.Context, tas
 func (p *SimpleTaskProcessor) createGoCodingStandards(ctx context.Context, outputFile string, payload map[string]string) (string, error) {
 	// Read the existing bash coding standards as reference
 	bashStandardsFile := "/home/niko/.claude/BASH_CODING_STANDARD_CLAUDE.md"
-	
+
 	prompt := fmt.Sprintf(`Create comprehensive Go coding standards document similar to the BASH coding standards at %s. Include:
 
 1. Core Principles section covering Go-specific best practices
@@ -132,20 +132,20 @@ Follow these Go-specific principles:
 - Zero values should be useful
 
 Format as markdown with clear examples of good and bad patterns. Make it comprehensive but practical.`, bashStandardsFile)
-	
+
 	// Use Gemini for comprehensive analysis (best for documentation)
 	cmd := exec.CommandContext(ctx, "gemini_code_analyzer", prompt)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate Go coding standards: %w", err)
 	}
-	
+
 	// Write to output file
 	err = os.WriteFile(outputFile, output, 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write output file %s: %w", outputFile, err)
 	}
-	
+
 	return fmt.Sprintf("Successfully created Go coding standards document: %s (%d bytes)", outputFile, len(output)), nil
 }
 
@@ -161,11 +161,11 @@ type WorkerApp struct {
 // NewWorkerApp creates a new worker application
 func NewWorkerApp(workerID, mqttHost string, mqttPort int) *WorkerApp {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	mqttClient := mqtt.NewClientWithID(mqttHost, mqttPort, fmt.Sprintf("worker-%s", workerID))
 	processor := &SimpleTaskProcessor{}
 	w := worker.NewWorker(workerID, processor)
-	
+
 	return &WorkerApp{
 		workerID:   workerID,
 		mqttClient: mqttClient,
@@ -178,45 +178,45 @@ func NewWorkerApp(workerID, mqttHost string, mqttPort int) *WorkerApp {
 // Start starts the worker application
 func (app *WorkerApp) Start() error {
 	log.Printf("Starting worker %s", app.workerID)
-	
+
 	// Connect to MQTT broker
 	connectCtx, connectCancel := context.WithTimeout(app.ctx, 10*time.Second)
 	defer connectCancel()
-	
+
 	if err := app.mqttClient.Connect(connectCtx); err != nil {
 		return fmt.Errorf("failed to connect to MQTT broker: %w", err)
 	}
-	
+
 	log.Printf("Connected to MQTT broker")
-	
+
 	// Subscribe to task topic
 	if err := app.mqttClient.Subscribe(app.ctx, TaskTopic, app.handleTask); err != nil {
 		return fmt.Errorf("failed to subscribe to task topic: %w", err)
 	}
-	
+
 	log.Printf("Subscribed to task topic: %s", TaskTopic)
-	
+
 	// Start status update goroutine
 	go app.publishStatusPeriodically()
-	
+
 	// Publish initial status
 	app.publishStatus()
-	
+
 	log.Printf("Worker %s is ready and waiting for tasks", app.workerID)
-	
+
 	return nil
 }
 
 // Stop stops the worker application
 func (app *WorkerApp) Stop() {
 	log.Printf("Stopping worker %s", app.workerID)
-	
+
 	app.cancel()
-	
+
 	if app.mqttClient != nil {
 		app.mqttClient.Disconnect()
 	}
-	
+
 	log.Printf("Worker %s stopped", app.workerID)
 }
 
@@ -227,15 +227,15 @@ func (app *WorkerApp) handleTask(payload []byte) {
 		log.Printf("Failed to unmarshal task: %v", err)
 		return
 	}
-	
+
 	log.Printf("Received task %s of type %s", task.ID, task.Type)
-	
+
 	// Process task with timeout
 	taskCtx, taskCancel := context.WithTimeout(app.ctx, TaskTimeout)
 	defer taskCancel()
-	
+
 	result := app.worker.ProcessTask(taskCtx, task)
-	
+
 	// Publish result
 	if err := app.publishResult(result); err != nil {
 		log.Printf("Failed to publish result for task %s: %v", task.ID, err)
@@ -250,25 +250,25 @@ func (app *WorkerApp) publishResult(result types.TaskResult) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal result: %w", err)
 	}
-	
+
 	ctx, cancel := context.WithTimeout(app.ctx, 5*time.Second)
 	defer cancel()
-	
+
 	return app.mqttClient.Publish(ctx, ResultTopic, data)
 }
 
 // publishStatus publishes worker status
 func (app *WorkerApp) publishStatus() error {
 	status := app.worker.GetStatus()
-	
+
 	data, err := json.Marshal(status)
 	if err != nil {
 		return fmt.Errorf("failed to marshal status: %w", err)
 	}
-	
+
 	ctx, cancel := context.WithTimeout(app.ctx, 5*time.Second)
 	defer cancel()
-	
+
 	topic := fmt.Sprintf("%s/%s", StatusTopic, app.workerID)
 	return app.mqttClient.Publish(ctx, topic, data)
 }
@@ -277,7 +277,7 @@ func (app *WorkerApp) publishStatus() error {
 func (app *WorkerApp) publishStatusPeriodically() {
 	ticker := time.NewTicker(StatusUpdateInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -300,27 +300,27 @@ func main() {
 		verbose  = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
-	
+
 	// Configure logging
 	if *verbose {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
-	
+
 	// Create worker application
 	app := NewWorkerApp(*workerID, *mqttHost, *mqttPort)
-	
+
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	// Start worker
 	if err := app.Start(); err != nil {
 		log.Fatalf("Failed to start worker: %v", err)
 	}
-	
+
 	// Wait for signal
 	<-sigChan
-	
+
 	// Graceful shutdown
 	app.Stop()
 }

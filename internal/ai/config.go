@@ -43,7 +43,7 @@ func LoadAIHelperConfig(configPath string) (*AIHelperConfig, error) {
 	// Following "Do more with less" - use hardcoded config that matches claude_helpers.toml
 	// Real implementation would use a TOML parser, but this works for our use case
 	var config AIHelperConfig
-	
+
 	// Set default values based on the TOML content
 	config = AIHelperConfig{
 		Cerebras: APIConfig{
@@ -132,7 +132,7 @@ func (d *DefaultsConfig) GetRetryDelay() time.Duration {
 // GetAvailableAPIs returns list of available AI APIs
 func (c *AIHelperConfig) GetAvailableAPIs() map[string]APIConfig {
 	apis := make(map[string]APIConfig)
-	
+
 	if c.Cerebras.IsAvailable() {
 		apis["cerebras"] = c.Cerebras
 	}
@@ -148,18 +148,18 @@ func (c *AIHelperConfig) GetAvailableAPIs() map[string]APIConfig {
 	if c.Groq.IsAvailable() {
 		apis["groq"] = c.Groq
 	}
-	
+
 	return apis
 }
 
 // GetPreferredAPI returns the preferred API based on task complexity
 func (c *AIHelperConfig) GetPreferredAPI(taskComplexity string) (string, APIConfig, error) {
 	available := c.GetAvailableAPIs()
-	
+
 	if len(available) == 0 {
 		return "", APIConfig{}, fmt.Errorf("no AI APIs available")
 	}
-	
+
 	// Priority order based on task complexity
 	var priorities []string
 	switch taskComplexity {
@@ -172,17 +172,17 @@ func (c *AIHelperConfig) GetPreferredAPI(taskComplexity string) (string, APIConf
 	default:
 		priorities = []string{"cerebras", "nvidia", "gemini", "grok", "groq"}
 	}
-	
+
 	for _, provider := range priorities {
 		if config, exists := available[provider]; exists {
 			return provider, config, nil
 		}
 	}
-	
+
 	// Fallback to first available
 	for name, config := range available {
 		return name, config, nil
 	}
-	
+
 	return "", APIConfig{}, fmt.Errorf("no suitable API found")
 }

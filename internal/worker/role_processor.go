@@ -60,7 +60,7 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 	if workflowTask.RequiredRole != p.role {
 		return "", fmt.Errorf("task requires role %s, but worker is %s", workflowTask.RequiredRole, p.role)
 	}
-	
+
 	// Get system prompt for this role from RAG
 	var systemPrompt string
 	if p.ragService != nil {
@@ -69,17 +69,17 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 			systemPrompt = prompt
 		}
 	}
-	
+
 	// Get relevant context if available
 	var ragContext string
 	if p.ragService != nil && p.capabilities.RAGEnabled {
-		context, err := p.ragService.GetRelevantContext(ctx, workflowTask.Type, 
+		context, err := p.ragService.GetRelevantContext(ctx, workflowTask.Type,
 			fmt.Sprintf("%s %s", workflowTask.Type, workflowTask.Payload["document_type"]))
 		if err == nil {
 			ragContext = context
 		}
 	}
-	
+
 	// Analyze content for optimal model selection
 	var modelAnalysis *AnalysisResult
 	if p.contentAnalyzer != nil {
@@ -88,15 +88,15 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 			modelAnalysis = analysis
 		}
 	}
-	
+
 	// Create enhanced task context for token optimization
 	taskContext := &EnhancedTaskContext{
-		SystemPrompt:   systemPrompt,
-		RAGContext:     ragContext,
-		Task:           workflowTask,
-		ModelAnalysis:  modelAnalysis,
+		SystemPrompt:  systemPrompt,
+		RAGContext:    ragContext,
+		Task:          workflowTask,
+		ModelAnalysis: modelAnalysis,
 	}
-	
+
 	// Process based on role and task type
 	switch p.role {
 	case types.RoleDeveloper:
@@ -114,9 +114,9 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 
 // EnhancedTaskContext provides optimized context for AI API calls
 type EnhancedTaskContext struct {
-	SystemPrompt string
-	RAGContext   string
-	Task         *types.WorkflowTask
+	SystemPrompt  string
+	RAGContext    string
+	Task          *types.WorkflowTask
 	ModelAnalysis *AnalysisResult
 }
 
@@ -135,7 +135,7 @@ func (p *RoleBasedProcessor) processReviewerTask(ctx context.Context, taskContex
 	if taskContext.Task.PreviousOutput == "" {
 		return "", fmt.Errorf("reviewer task requires previous output")
 	}
-	
+
 	switch taskContext.Task.Type {
 	case "create_document":
 		return p.reviewDocument(ctx, taskContext)
@@ -149,7 +149,7 @@ func (p *RoleBasedProcessor) processApproverTask(ctx context.Context, taskContex
 	if taskContext.Task.PreviousOutput == "" {
 		return "", fmt.Errorf("approver task requires previous output")
 	}
-	
+
 	switch taskContext.Task.Type {
 	case "create_document":
 		return p.approveDocument(ctx, taskContext)
@@ -171,7 +171,7 @@ func (p *RoleBasedProcessor) processTesterTask(ctx context.Context, taskContext 
 // createDocument creates initial document content with optimized context
 func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
 	documentType := taskContext.Task.Payload["document_type"]
-	
+
 	// Try local model first if available
 	if p.modelManager != nil && taskContext.ModelAnalysis != nil {
 		result, err := p.processWithLocalModel(ctx, taskContext, taskContext.ModelAnalysis.RecommendedModel)
@@ -180,10 +180,10 @@ func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *En
 		}
 		// Fall back to external AI helper if local model fails
 	}
-	
+
 	// Build optimized prompt using system prompt and RAG context
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
-	
+
 	// Use most appropriate AI helper for initial creation
 	aiHelper := p.selectAIHelper("development")
 	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
@@ -191,7 +191,7 @@ func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *En
 	if err != nil {
 		return "", fmt.Errorf("AI helper %s failed: %w", aiHelper, err)
 	}
-	
+
 	return string(output), nil
 }
 
@@ -199,7 +199,7 @@ func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *En
 func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
 	// Build optimized prompt for review phase
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "review", taskContext.Task.Payload["document_type"])
-	
+
 	// Use AI helper focused on review/analysis
 	aiHelper := p.selectAIHelper("review")
 	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
@@ -207,7 +207,7 @@ func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, taskContext *En
 	if err != nil {
 		return "", fmt.Errorf("review AI helper %s failed: %w", aiHelper, err)
 	}
-	
+
 	return string(output), nil
 }
 
@@ -215,7 +215,7 @@ func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, taskContext *En
 func (p *RoleBasedProcessor) approveDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
 	// Build optimized prompt for approval phase
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "approve", taskContext.Task.Payload["document_type"])
-	
+
 	// Use AI helper best for final analysis
 	aiHelper := p.selectAIHelper("approval")
 	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
@@ -223,53 +223,53 @@ func (p *RoleBasedProcessor) approveDocument(ctx context.Context, taskContext *E
 	if err != nil {
 		return "", fmt.Errorf("approval AI helper %s failed: %w", aiHelper, err)
 	}
-	
+
 	return string(output), nil
 }
 
 // testDocument validates the document
 func (p *RoleBasedProcessor) testDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
 	content := taskContext.Task.PreviousOutput
-	
+
 	// For coding standards, test by checking examples compile/lint
 	if taskContext.Task.Payload["document_type"] == "go_coding_standards" {
 		return p.testGoCodingStandards(ctx, content)
 	}
-	
+
 	return "Document testing not implemented for this type", nil
 }
 
 // buildOptimizedPrompt creates token-efficient prompts using system prompt and RAG context
 func (p *RoleBasedProcessor) buildOptimizedPrompt(taskContext *EnhancedTaskContext, phase, documentType string) string {
 	var prompt strings.Builder
-	
+
 	// Start with system prompt for role context (reduces token usage by providing clear role definition)
 	if taskContext.SystemPrompt != "" {
 		prompt.WriteString(taskContext.SystemPrompt)
 		prompt.WriteString("\n\n")
 	}
-	
+
 	// Add relevant RAG context (reduces token usage by providing specific domain knowledge)
 	if taskContext.RAGContext != "" {
 		prompt.WriteString("Relevant Context:\n")
 		prompt.WriteString(taskContext.RAGContext)
 		prompt.WriteString("\n\n")
 	}
-	
+
 	// Add phase-specific instructions (concise and targeted)
 	switch phase {
 	case "create":
 		prompt.WriteString(fmt.Sprintf("Create a comprehensive %s document.", documentType))
-		
+
 	case "review":
-		prompt.WriteString(fmt.Sprintf("Review and improve this %s document.\n\nPrevious version:\n%s", 
+		prompt.WriteString(fmt.Sprintf("Review and improve this %s document.\n\nPrevious version:\n%s",
 			documentType, taskContext.Task.PreviousOutput))
-			
+
 	case "approve":
-		prompt.WriteString(fmt.Sprintf("Perform final approval for this %s document.\n\nContent to approve:\n%s\n\nRespond with APPROVED: [reason] or REJECTED: [issues]", 
+		prompt.WriteString(fmt.Sprintf("Perform final approval for this %s document.\n\nContent to approve:\n%s\n\nRespond with APPROVED: [reason] or REJECTED: [issues]",
 			documentType, taskContext.Task.PreviousOutput))
 	}
-	
+
 	return prompt.String()
 }
 
@@ -278,35 +278,35 @@ func (p *RoleBasedProcessor) processWithLocalModel(ctx context.Context, taskCont
 	if p.modelManager == nil {
 		return "", fmt.Errorf("model manager not available")
 	}
-	
+
 	// Load the model if not already loaded
 	if err := p.modelManager.LoadModel(ctx, modelName); err != nil {
 		return "", fmt.Errorf("failed to load model %s: %w", modelName, err)
 	}
-	
+
 	// Get model instance
 	model, err := p.modelManager.GetModel(modelName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get model %s: %w", modelName, err)
 	}
-	
+
 	// Build optimized prompt
 	documentType := taskContext.Task.Payload["document_type"]
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
-	
+
 	// Create model input
 	input := localmodels.ModelInput{
 		Text:        optimizedPrompt,
 		Temperature: 0.7,
 		MaxTokens:   2048,
 	}
-	
+
 	// Process with local model
 	output, err := model.Predict(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("local model prediction failed: %w", err)
 	}
-	
+
 	return output.Text, nil
 }
 
@@ -352,22 +352,22 @@ func (p *RoleBasedProcessor) testGoCodingStandards(ctx context.Context, content 
 	// For now, just validate the document structure
 	requiredSections := []string{
 		"Core Principles",
-		"Error Handling", 
+		"Error Handling",
 		"Testing Standards",
 		"Compliance Checklist",
 	}
-	
+
 	var missingSection []string
 	for _, section := range requiredSections {
 		if !strings.Contains(content, section) {
 			missingSection = append(missingSection, section)
 		}
 	}
-	
+
 	if len(missingSection) > 0 {
 		return fmt.Sprintf("FAILED: Missing required sections: %s", strings.Join(missingSection, ", ")), nil
 	}
-	
+
 	return "PASSED: Document structure validates successfully", nil
 }
 

@@ -14,16 +14,16 @@ var (
 	ErrProviderTimeout     = errors.New("provider request timeout")
 
 	// Model errors
-	ErrModelNotFound      = errors.New("model not found")
-	ErrModelNotSupported  = errors.New("model not supported by provider")
-	ErrInvalidModel       = errors.New("invalid model configuration")
-	ErrModelLoadFailed    = errors.New("failed to load model")
+	ErrModelNotFound     = errors.New("model not found")
+	ErrModelNotSupported = errors.New("model not supported by provider")
+	ErrInvalidModel      = errors.New("invalid model configuration")
+	ErrModelLoadFailed   = errors.New("failed to load model")
 
 	// Request errors
-	ErrInvalidRequest     = errors.New("invalid request")
-	ErrInvalidResponse    = errors.New("invalid response")
-	ErrRequestTooLarge    = errors.New("request exceeds size limits")
-	ErrRateLimited        = errors.New("rate limit exceeded")
+	ErrInvalidRequest  = errors.New("invalid request")
+	ErrInvalidResponse = errors.New("invalid response")
+	ErrRequestTooLarge = errors.New("request exceeds size limits")
+	ErrRateLimited     = errors.New("rate limit exceeded")
 
 	// Cost errors
 	ErrCostLimitExceeded = errors.New("cost limit exceeded")
@@ -91,7 +91,7 @@ func WrapProviderError(err error, provider, model, requestID string) error {
 	}
 
 	var code, message string
-	
+
 	switch {
 	case errors.Is(err, ErrProviderTimeout):
 		code = "PROVIDER_TIMEOUT"

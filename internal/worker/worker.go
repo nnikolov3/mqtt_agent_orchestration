@@ -17,14 +17,14 @@ type TaskProcessor interface {
 type Worker struct {
 	id        string
 	processor TaskProcessor
-	
+
 	// Statistics tracking
-	mu           sync.RWMutex
-	tasksTotal   int
-	tasksError   int
-	currentTask  string
-	status       string
-	lastSeen     time.Time
+	mu          sync.RWMutex
+	tasksTotal  int
+	tasksError  int
+	currentTask string
+	status      string
+	lastSeen    time.Time
 }
 
 // NewWorker creates a new worker with the specified ID and processor
@@ -40,7 +40,7 @@ func NewWorker(id string, processor TaskProcessor) *Worker {
 // ProcessTask processes a single task and returns the result
 func (w *Worker) ProcessTask(ctx context.Context, task types.Task) types.TaskResult {
 	startTime := time.Now()
-	
+
 	// Update worker status
 	w.mu.Lock()
 	w.status = "busy"
@@ -48,7 +48,7 @@ func (w *Worker) ProcessTask(ctx context.Context, task types.Task) types.TaskRes
 	w.tasksTotal++
 	w.lastSeen = time.Now()
 	w.mu.Unlock()
-	
+
 	// Ensure we reset status when done
 	defer func() {
 		w.mu.Lock()
@@ -57,12 +57,12 @@ func (w *Worker) ProcessTask(ctx context.Context, task types.Task) types.TaskRes
 		w.lastSeen = time.Now()
 		w.mu.Unlock()
 	}()
-	
+
 	// Process the task
 	result, err := w.processor.ProcessTask(ctx, task)
-	
+
 	duration := time.Since(startTime)
-	
+
 	// Build result
 	taskResult := types.TaskResult{
 		TaskID:      task.ID,
@@ -70,19 +70,19 @@ func (w *Worker) ProcessTask(ctx context.Context, task types.Task) types.TaskRes
 		ProcessedAt: time.Now(),
 		Duration:    duration.Milliseconds(),
 	}
-	
+
 	if err != nil {
 		w.mu.Lock()
 		w.tasksError++
 		w.mu.Unlock()
-		
+
 		taskResult.Success = false
 		taskResult.Error = err.Error()
 	} else {
 		taskResult.Success = true
 		taskResult.Result = result
 	}
-	
+
 	return taskResult
 }
 
@@ -90,7 +90,7 @@ func (w *Worker) ProcessTask(ctx context.Context, task types.Task) types.TaskRes
 func (w *Worker) GetStatus() types.WorkerStatus {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	
+
 	return types.WorkerStatus{
 		ID:          w.id,
 		Status:      w.status,

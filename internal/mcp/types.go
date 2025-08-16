@@ -29,9 +29,9 @@ type Error struct {
 
 // InitializeParams represents initialization parameters
 type InitializeParams struct {
-	ProtocolVersion string              `json:"protocolVersion"`
-	Capabilities    ClientCapabilities  `json:"capabilities"`
-	ClientInfo      *ClientInfo         `json:"clientInfo,omitempty"`
+	ProtocolVersion string             `json:"protocolVersion"`
+	Capabilities    ClientCapabilities `json:"capabilities"`
+	ClientInfo      *ClientInfo        `json:"clientInfo,omitempty"`
 }
 
 // ClientCapabilities represents client capabilities
@@ -77,17 +77,17 @@ type ToolResult struct {
 
 // ToolResultContent represents content in a tool result
 type ToolResultContent struct {
-	Type    string                 `json:"type"`
-	Text    string                 `json:"text,omitempty"`
-	Image   *ImageContent          `json:"image,omitempty"`
-	Data    map[string]interface{} `json:"data,omitempty"`
+	Type  string                 `json:"type"`
+	Text  string                 `json:"text,omitempty"`
+	Image *ImageContent          `json:"image,omitempty"`
+	Data  map[string]interface{} `json:"data,omitempty"`
 }
 
 // ImageContent represents image content
 type ImageContent struct {
-	URI       string `json:"uri"`
-	AltText   string `json:"altText,omitempty"`
-	MimeType  string `json:"mimeType,omitempty"`
+	URI      string `json:"uri"`
+	AltText  string `json:"altText,omitempty"`
+	MimeType string `json:"mimeType,omitempty"`
 }
 
 // Resource represents an MCP resource

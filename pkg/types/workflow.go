@@ -4,10 +4,10 @@ package types
 type WorkerRole string
 
 const (
-	RoleDeveloper WorkerRole = "developer"
-	RoleReviewer  WorkerRole = "reviewer" 
-	RoleApprover  WorkerRole = "approver"
-	RoleTester    WorkerRole = "tester"
+	RoleDeveloper    WorkerRole = "developer"
+	RoleReviewer     WorkerRole = "reviewer"
+	RoleApprover     WorkerRole = "approver"
+	RoleTester       WorkerRole = "tester"
 	RoleOrchestrator WorkerRole = "orchestrator"
 )
 
@@ -26,14 +26,14 @@ const (
 // WorkflowTask extends Task with role-based information
 type WorkflowTask struct {
 	Task
-	WorkflowID       string            `json:"workflow_id"`
-	Stage            WorkflowStage     `json:"stage"`
-	RequiredRole     WorkerRole        `json:"required_role"`
-	PreviousOutput   string            `json:"previous_output,omitempty"`
-	ReviewFeedback   string            `json:"review_feedback,omitempty"`
-	RAGContext       string            `json:"rag_context,omitempty"`
-	RetryCount       int               `json:"retry_count"`
-	MaxRetries       int               `json:"max_retries"`
+	WorkflowID     string        `json:"workflow_id"`
+	Stage          WorkflowStage `json:"stage"`
+	RequiredRole   WorkerRole    `json:"required_role"`
+	PreviousOutput string        `json:"previous_output,omitempty"`
+	ReviewFeedback string        `json:"review_feedback,omitempty"`
+	RAGContext     string        `json:"rag_context,omitempty"`
+	RetryCount     int           `json:"retry_count"`
+	MaxRetries     int           `json:"max_retries"`
 }
 
 // WorkflowResult extends TaskResult with workflow information
@@ -60,10 +60,10 @@ type WorkerCapabilities struct {
 // ExtendedWorkerStatus extends WorkerStatus with role information
 type ExtendedWorkerStatus struct {
 	WorkerStatus
-	Role           WorkerRole          `json:"role"`
-	Capabilities   WorkerCapabilities  `json:"capabilities"`
-	AssignedStage  WorkflowStage       `json:"assigned_stage,omitempty"`
-	WorkflowID     string              `json:"workflow_id,omitempty"`
+	Role          WorkerRole         `json:"role"`
+	Capabilities  WorkerCapabilities `json:"capabilities"`
+	AssignedStage WorkflowStage      `json:"assigned_stage,omitempty"`
+	WorkflowID    string             `json:"workflow_id,omitempty"`
 }
 
 // RAGQuery represents a query to the knowledge base
@@ -79,13 +79,13 @@ type RAGQuery struct {
 type RAGResponse struct {
 	Documents []RAGDocument `json:"documents"`
 	Query     string        `json:"query"`
-	TotalHits int          `json:"total_hits"`
+	TotalHits int           `json:"total_hits"`
 }
 
 // RAGDocument represents a document from the knowledge base
 type RAGDocument struct {
-	Content   string             `json:"content"`
-	Score     float64           `json:"score"`
-	Metadata  map[string]string `json:"metadata"`
-	Source    string            `json:"source"`
+	Content  string            `json:"content"`
+	Score    float64           `json:"score"`
+	Metadata map[string]string `json:"metadata"`
+	Source   string            `json:"source"`
 }
