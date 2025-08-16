@@ -7,28 +7,43 @@
 set -euo pipefail
 
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
-COLLECTION_NAME="${COLLECTION_NAME:-project_knowledge}"
-EMBEDDING_MODEL="${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}"
-MCP_PORT="${MCP_PORT:-8000}"
+declare -r SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+declare -r PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+declare -r QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+declare -r COLLECTION_NAME="${COLLECTION_NAME:-project_knowledge}"
+declare -r EMBEDDING_MODEL="${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}"
+declare -r MCP_PORT="${MCP_PORT:-8000}"
 
 # Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+declare -r RED='\033[0;31m'
+declare -r GREEN='\033[0;32m'
+declare -r YELLOW='\033[1;33m'
+declare -r BLUE='\033[0;34m'
+declare -r NC='\033[0m' # No Color
 
 # Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+function log_info() {
+    local message="$1"
+    echo -e "${BLUE}[INFO]${NC} $message"
+}
+
+function log_success() {
+    local message="$1"
+    echo -e "${GREEN}[SUCCESS]${NC} $message"
+}
+
+function log_warning() {
+    local message="$1"
+    echo -e "${YELLOW}[WARNING]${NC} $message"
+}
+
+function log_error() {
+    local message="$1"
+    echo -e "${RED}[ERROR]${NC} $message"
+}
 
 # Help function
-show_help() {
+function show_help() {
     cat << EOF
 Qdrant MCP Server Installation Script
 
@@ -54,21 +69,30 @@ EOF
 }
 
 # Check dependencies
-check_dependencies() {
+function check_dependencies() {
     local missing_deps=()
+    local dep=""
+    local check_result=""
+    local check_exit=""
     
     # Check for uvx (preferred method)
-    if ! command -v uvx >/dev/null 2>&1; then
+    check_result=$(command -v uvx 2>&1)
+    check_exit="$?"
+    if [[ "$check_exit" -ne 0 ]]; then
         missing_deps+=("uvx")
     fi
     
     # Check for Docker (alternative method)
-    if ! command -v docker >/dev/null 2>&1; then
+    check_result=$(command -v docker 2>&1)
+    check_exit="$?"
+    if [[ "$check_exit" -ne 0 ]]; then
         missing_deps+=("docker")
     fi
     
     # Check for curl
-    if ! command -v curl >/dev/null 2>&1; then
+    check_result=$(command -v curl 2>&1)
+    check_exit="$?"
+    if [[ "$check_exit" -ne 0 ]]; then
         missing_deps+=("curl")
     fi
     

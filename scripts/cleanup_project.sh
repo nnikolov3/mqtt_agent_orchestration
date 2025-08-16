@@ -13,18 +13,18 @@ set -euo pipefail
 [[ "${DEBUG:-0}" == "1" ]] && set -x
 
 # Color codes for output formatting
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m' # No Color
+declare -r RED='\033[0;31m'
+declare -r GREEN='\033[0;32m'
+declare -r YELLOW='\033[1;33m'
+declare -r BLUE='\033[0;34m'
+declare -r NC='\033[0m' # No Color
 
 # Script configuration
-readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly PROJECT_ROOT="${SCRIPT_DIR}"
-readonly BACKUP_DIR="${PROJECT_ROOT}/.backup"
-readonly LOG_FILE="${PROJECT_ROOT}/cleanup.log"
+declare -r SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+declare -r SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+declare -r PROJECT_ROOT="${SCRIPT_DIR}"
+declare -r BACKUP_DIR="${PROJECT_ROOT}/.backup"
+declare -r LOG_FILE="${PROJECT_ROOT}/cleanup.log"
 
 # Default configuration values
 declare -i DRY_RUN=0
@@ -74,24 +74,28 @@ declare -a PYTHON_CACHE=(
 )
 
 # CI/CD configuration files to create
-readonly CI_CONFIG_DIR=".github/workflows"
-readonly CI_CONFIG_FILE="${CI_CONFIG_DIR}/mqtt-orchestration.yml"
+declare -r CI_CONFIG_DIR=".github/workflows"
+declare -r CI_CONFIG_FILE="${CI_CONFIG_DIR}/mqtt-orchestration.yml"
 
 # Function to print colored output
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $*" | tee -a "${LOG_FILE}"
+function print_info() {
+    local message="$*"
+    echo -e "${BLUE}[INFO]${NC} $message" | tee -a "${LOG_FILE}"
 }
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $*" | tee -a "${LOG_FILE}"
+function print_success() {
+    local message="$*"
+    echo -e "${GREEN}[SUCCESS]${NC} $message" | tee -a "${LOG_FILE}"
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $*" | tee -a "${LOG_FILE}" >&2
+function print_warning() {
+    local message="$*"
+    echo -e "${YELLOW}[WARNING]${NC} $message" | tee -a "${LOG_FILE}" >&2
 }
 
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $*" | tee -a "${LOG_FILE}" >&2
+function print_error() {
+    local message="$*"
+    echo -e "${RED}[ERROR]${NC} $message" | tee -a "${LOG_FILE}" >&2
 }
 
 # Function to log messages without color codes
