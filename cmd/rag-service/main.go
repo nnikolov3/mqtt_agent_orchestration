@@ -18,14 +18,15 @@ import (
 const (
 	QdrantHost        = "localhost"
 	QdrantPort        = 6334 // gRPC port
-	CollectionName    = "agent_rag"
+	DefaultCollection = "agent_rag"
 	EmbeddingDim      = 2560 // Qwen3-Embedding-4B dimensions
 	EmbeddingModel    = "./models/Qwen3-Embedding-4B-Q8_0.gguf"
 	LlamaEmbeddingBin = "/home/niko/bin/llama-embedding"
 )
 
 type RAGService struct {
-	client *qdrant.Client
+	client         *qdrant.Client
+	collectionName string
 }
 
 type Document struct {
@@ -51,7 +52,16 @@ func main() {
 		log.Fatalf("Failed to connect to Qdrant: %v", err)
 	}
 
-	service := &RAGService{client: client}
+	// Determine collection name from project or use default
+	collectionName := DefaultCollection
+	if len(os.Args) > 2 && os.Args[1] == "register" && len(os.Args) > 2 {
+		collectionName = os.Args[2] // Use project name as collection
+	}
+
+	service := &RAGService{
+		client:         client,
+		collectionName: collectionName,
+	}
 
 	// Initialize collection
 	err = service.initializeCollection()
@@ -65,6 +75,8 @@ func main() {
 		handleRegister(service, os.Args[2:])
 	case "store-standards":
 		handleStoreStandards(service, os.Args[2:])
+	case "store-project":
+		handleStoreProject(service, os.Args[2:])
 	case "search":
 		handleSearch(service, os.Args[2:])
 	case "context":
@@ -87,7 +99,7 @@ func (r *RAGService) initializeCollection() error {
 
 	// Create collection
 	err := r.client.CreateCollection(ctx, &qdrant.CreateCollection{
-		CollectionName: CollectionName,
+		CollectionName: r.collectionName,
 		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
 			Size:     EmbeddingDim,
 			Distance: qdrant.Distance_Cosine,
@@ -126,7 +138,7 @@ func (r *RAGService) storeDocument(doc Document) error {
 	}
 
 	_, err2 := r.client.Upsert(ctx, &qdrant.UpsertPoints{
-		CollectionName: CollectionName,
+		CollectionName: r.collectionName,
 		Points:         []*qdrant.PointStruct{point},
 	})
 
@@ -144,7 +156,7 @@ func (r *RAGService) searchDocuments(query string, limit int) ([]Document, error
 
 	// Search
 	searchResult, err := r.client.Query(ctx, &qdrant.QueryPoints{
-		CollectionName: CollectionName,
+		CollectionName: r.collectionName,
 		Query:          qdrant.NewQuery(queryEmbedding...),
 		Limit:          qdrant.PtrOf(uint64(limit)),
 		WithPayload:    qdrant.NewWithPayload(true),
@@ -290,6 +302,118 @@ func handleStoreStandards(service *RAGService, args []string) {
 	}
 
 	fmt.Println("Stored AI agent guidelines and coding standards in Qdrant")
+}
+
+func handleStoreProject(service *RAGService, args []string) {
+	if len(args) < 2 {
+		fmt.Println("Usage: rag-service store-project <project-name> <project-path>")
+		os.Exit(1)
+	}
+
+	projectName := args[0]
+	projectPath := args[1]
+
+	// Update service to use project name as collection
+	service.collectionName = projectName
+
+	// Re-initialize collection for this project
+	err := service.initializeCollection()
+	if err != nil {
+		log.Printf("Warning: Collection initialization for %s: %v", projectName, err)
+	}
+
+	// Store all relevant project files
+	err = storeProjectFiles(service, projectName, projectPath)
+	if err != nil {
+		log.Fatalf("Failed to store project files: %v", err)
+	}
+
+	fmt.Printf("Successfully stored project %s files in collection %s\n", projectName, projectName)
+}
+
+func storeProjectFiles(service *RAGService, projectName, projectPath string) error {
+	// Store key project files
+	filesToStore := []string{
+		"README.md",
+		"go.mod",
+		"go.sum",
+		"main.go",
+		"Makefile",
+		".gitignore",
+	}
+
+	// Add all Go source files
+	cmd := exec.Command("find", projectPath, "-name", "*.go", "-type", "f")
+	output, err := cmd.Output()
+	if err == nil {
+		goFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, file := range goFiles {
+			if file != "" {
+				filesToStore = append(filesToStore, strings.TrimPrefix(file, projectPath+"/"))
+			}
+		}
+	}
+
+	// Add shell scripts
+	cmd = exec.Command("find", projectPath, "-name", "*.sh", "-type", "f")
+	output, err = cmd.Output()
+	if err == nil {
+		shellFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, file := range shellFiles {
+			if file != "" {
+				filesToStore = append(filesToStore, strings.TrimPrefix(file, projectPath+"/"))
+			}
+		}
+	}
+
+	// Store each file
+	for _, relPath := range filesToStore {
+		fullPath := projectPath + "/" + relPath
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			continue
+		}
+
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			log.Printf("Warning: Failed to read %s: %v", relPath, err)
+			continue
+		}
+
+		doc := Document{
+			ID:      fmt.Sprintf("%s_%s", projectName, strings.ReplaceAll(relPath, "/", "_")),
+			Content: string(content),
+			Type:    "source_code",
+			Source:  relPath,
+			Metadata: map[string]string{
+				"project":    projectName,
+				"file_path":  relPath,
+				"file_type":  getFileType(relPath),
+				"updated_at": time.Now().Format(time.RFC3339),
+			},
+		}
+
+		err = service.storeDocument(doc)
+		if err != nil {
+			log.Printf("Warning: Failed to store %s: %v", relPath, err)
+		} else {
+			log.Printf("Stored: %s", relPath)
+		}
+	}
+
+	return nil
+}
+
+func getFileType(path string) string {
+	if strings.HasSuffix(path, ".go") {
+		return "golang"
+	} else if strings.HasSuffix(path, ".sh") {
+		return "shell"
+	} else if strings.HasSuffix(path, ".md") {
+		return "markdown"
+	} else if strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".yaml") {
+		return "yaml"
+	}
+	return "text"
 }
 
 func handleSearch(service *RAGService, args []string) {
@@ -438,7 +562,7 @@ func handleExportTrainingData(service *RAGService, args []string) {
 	}
 
 	var format string = "llama-finetune"
-	var collection string = CollectionName
+	var collection string = DefaultCollection
 	var minScore float64 = 0.7
 
 	// Parse arguments
@@ -517,6 +641,7 @@ Usage: rag-service <command> [args...]
 Commands:
   register <project> <path> <technologies>    Register project in vector DB
   store-standards                             Store Claude standards in vector DB
+  store-project <project-name> <project-path> Store all project files in project collection
   search <query>                             Semantic search across all data
   context <project> <type> <query>           Get relevant context
   list-projects                              List registered projects
@@ -526,6 +651,7 @@ Commands:
 Examples:
   rag-service store-standards
   rag-service register myapp /path/to/app go,local
+  rag-service store-project mqtt_agent_orchestration /home/niko/Dev/mqtt_agent_orchestration
   rag-service search "error handling best practices"
   rag-service context myapp development "create HTTP handler"
   rag-service export-training-data --format llama-finetune > training.jsonl`)
