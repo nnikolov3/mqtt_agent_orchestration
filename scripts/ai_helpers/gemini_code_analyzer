@@ -1,0 +1,314 @@
+#!/usr/bin/env bash
+
+# Design: Helper script for Claude Code to use Gemini AI for comprehensive code analysis
+# Purpose: Complex code review, architecture analysis, and multimodal tasks using Gemini API
+# Usage: gemini_code_analyzer.sh "prompt" [input_file] [image_file]
+
+set -euo pipefail
+
+# ALL global variables declared at top
+declare SCRIPT_DIR=""
+declare CONFIG_FILE_GLOBAL=""
+declare GEMINI_API_KEY_GLOBAL=""
+declare -a GEMINI_MODELS_GLOBAL=()
+declare MAX_TOKENS_GLOBAL=""
+declare TEMPERATURE_GLOBAL=""
+declare TOP_P_GLOBAL=""
+declare API_URL_GLOBAL=""
+declare TIMEOUT_GLOBAL=""
+declare prompt_text=""
+declare input_file=""
+declare image_file=""
+declare input_content=""
+declare image_base64=""
+declare full_prompt=""
+declare temp_payload=""
+declare temp_response=""
+declare model=""
+declare api_response=""
+declare api_exit=""
+declare enhanced_content=""
+
+# Initialize variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Handle both direct execution and symlink execution
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    # Script is symlinked, find the real location
+    REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+    REAL_DIR="$(dirname "$REAL_SCRIPT")"
+    CONFIG_FILE_GLOBAL="$REAL_DIR/claude_helpers.toml"
+else
+    # Script executed directly
+    CONFIG_FILE_GLOBAL="$SCRIPT_DIR/claude_helpers.toml"
+fi
+
+# Load configuration from TOML file
+function load_config() {
+    if [[ ! -f "$CONFIG_FILE_GLOBAL" ]]; then
+        echo "Error: Configuration file not found: $CONFIG_FILE_GLOBAL" >&2
+        exit 1
+    fi
+    
+    # Check if yq is available
+    if ! command -v yq >/dev/null; then
+        echo "Error: yq is required to parse TOML configuration" >&2
+        exit 1
+    fi
+    
+    # Load Gemini configuration
+    local api_key_var=""
+    api_key_var=$(yq '.gemini.api_key_variable' "$CONFIG_FILE_GLOBAL")
+    MAX_TOKENS_GLOBAL=$(yq '.gemini.max_tokens' "$CONFIG_FILE_GLOBAL")
+    TEMPERATURE_GLOBAL=$(yq '.gemini.temperature' "$CONFIG_FILE_GLOBAL")
+    TOP_P_GLOBAL=$(yq '.gemini.top_p' "$CONFIG_FILE_GLOBAL")
+    API_URL_GLOBAL=$(yq '.gemini.api_url' "$CONFIG_FILE_GLOBAL")
+    TIMEOUT_GLOBAL=$(yq '.gemini.timeout' "$CONFIG_FILE_GLOBAL")
+    
+    # Load models array
+    local models_count=""
+    models_count=$(yq '.gemini.models | length' "$CONFIG_FILE_GLOBAL")
+    for ((i=0; i<models_count; i++)); do
+        GEMINI_MODELS_GLOBAL+=("$(yq ".gemini.models[$i]" "$CONFIG_FILE_GLOBAL")")
+    done
+    
+    # Load API key from environment variable
+    if [[ -n "${!api_key_var:-}" ]]; then
+        GEMINI_API_KEY_GLOBAL="${!api_key_var}"
+    else
+        echo "Error: Environment variable $api_key_var is not set" >&2
+        exit 1
+    fi
+}
+
+# Check dependencies
+function check_dependencies() {
+    local dep=""
+    local -a required_deps=("curl" "jq" "mktemp" "base64" "yq" "file")
+    
+    for dep in "${required_deps[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            echo "Error: Required dependency not found: $dep" >&2
+            exit 1
+        fi
+    done
+}
+
+# Validate input parameters
+function validate_inputs() {
+    if [[ $# -lt 1 || $# -gt 3 ]]; then
+        echo "Usage: $0 \"prompt\" [input_file] [image_file]" >&2
+        echo "Examples:" >&2
+        echo "  $0 \"Review this architecture for scalability issues\" main.go" >&2
+        echo "  $0 \"Analyze this diagram and code together\" code.py diagram.png" >&2
+        echo "  $0 \"Comprehensive code review\" < large_file.go" >&2
+        exit 1
+    fi
+    
+    prompt_text="$1"
+    input_file="${2:-}"
+    image_file="${3:-}"
+    
+    if [[ -z "$prompt_text" ]]; then
+        echo "Error: Prompt cannot be empty" >&2
+        exit 1
+    fi
+}
+
+# Read input content from file or stdin
+function read_input_content() {
+    if [[ -n "$input_file" ]]; then
+        if [[ ! -f "$input_file" ]]; then
+            echo "Error: Input file does not exist: $input_file" >&2
+            exit 1
+        fi
+        input_content=$(cat "$input_file")
+    elif [[ ! -t 0 ]]; then
+        # Read from stdin if available
+        input_content=$(cat)
+    else
+        input_content=""
+    fi
+}
+
+# Process image file if provided
+function process_image_file() {
+    if [[ -n "$image_file" ]]; then
+        if [[ ! -f "$image_file" ]]; then
+            echo "Error: Image file does not exist: $image_file" >&2
+            exit 1
+        fi
+        
+        # Check if file is an image
+        if ! file "$image_file" | grep -q -E "(image|bitmap)"; then
+            echo "Error: File is not a recognized image format: $image_file" >&2
+            exit 1
+        fi
+        
+        # Convert image to base64
+        image_base64=$(base64 -w 0 "$image_file")
+        if [[ -z "$image_base64" ]]; then
+            echo "Error: Failed to encode image as base64" >&2
+            exit 1
+        fi
+    fi
+}
+
+# Create enhanced prompt with multimodal content
+function create_enhanced_prompt() {
+    local content_section=""
+    
+    if [[ -n "$input_content" ]]; then
+        content_section="Code/Content to analyze:
+\`\`\`
+$input_content
+\`\`\`
+
+"
+    fi
+    
+    if [[ -n "$image_file" ]]; then
+        full_prompt="$prompt_text
+
+${content_section}Additional visual context provided in image: $image_file
+
+Please provide comprehensive analysis considering both textual and visual elements. Focus on:
+1. Code quality and best practices
+2. Architecture and design patterns  
+3. Security considerations
+4. Performance implications
+5. Maintainability and scalability
+6. Integration with visual elements (if applicable)"
+    else
+        full_prompt="$prompt_text
+
+${content_section}Please provide detailed technical analysis following industry best practices and comprehensive code review standards."
+    fi
+}
+
+# Call Gemini API with model fallback
+function call_gemini_api() {
+    local model_index=0
+    local curl_exit=""
+    local model_url=""
+    
+    # Create temporary files
+    temp_payload=$(mktemp)
+    temp_response=$(mktemp)
+    
+    # Cleanup function
+    function cleanup_temps() {
+        rm -f "$temp_payload" "$temp_response"
+    }
+    trap cleanup_temps EXIT
+    
+    for model in "${GEMINI_MODELS_GLOBAL[@]}"; do
+        model_index=$((model_index + 1))
+        echo "Trying Gemini model: $model ($model_index/${#GEMINI_MODELS_GLOBAL[@]})" >&2
+        
+        # Build model-specific URL
+        model_url="${API_URL_GLOBAL/\{model\}/$model}"
+        
+        # Create content parts array based on whether we have an image
+        if [[ -n "$image_base64" ]]; then
+            # Determine MIME type from file extension
+            local mime_type="image/jpeg"
+            case "${image_file##*.}" in
+                png) mime_type="image/png" ;;
+                jpg|jpeg) mime_type="image/jpeg" ;;
+                gif) mime_type="image/gif" ;;
+                webp) mime_type="image/webp" ;;
+            esac
+            
+            # Multimodal payload with image
+            jq -n \
+                --arg text "$full_prompt" \
+                --arg image_data "$image_base64" \
+                --arg mime_type "$mime_type" \
+                --arg max_tokens "$MAX_TOKENS_GLOBAL" \
+                --arg temperature "$TEMPERATURE_GLOBAL" \
+                --arg top_p "$TOP_P_GLOBAL" '{
+                    "contents": [{
+                        "parts": [
+                            {"text": $text},
+                            {
+                                "inline_data": {
+                                    "mime_type": $mime_type,
+                                    "data": $image_data
+                                }
+                            }
+                        ]
+                    }],
+                    "generationConfig": {
+                        "maxOutputTokens": ($max_tokens | tonumber),
+                        "temperature": ($temperature | tonumber),
+                        "topP": ($top_p | tonumber)
+                    }
+                }' > "$temp_payload"
+        else
+            # Text-only payload
+            jq -n \
+                --arg prompt "$full_prompt" \
+                --arg max_tokens "$MAX_TOKENS_GLOBAL" \
+                --arg temperature "$TEMPERATURE_GLOBAL" \
+                --arg top_p "$TOP_P_GLOBAL" '{
+                    "contents": [{
+                        "parts": [{"text": $prompt}]
+                    }],
+                    "generationConfig": {
+                        "maxOutputTokens": ($max_tokens | tonumber),
+                        "temperature": ($temperature | tonumber),
+                        "topP": ($top_p | tonumber)
+                    }
+                }' > "$temp_payload"
+        fi
+        
+        # Make API call
+        api_response=$(curl -sS \
+            --location "$model_url?key=$GEMINI_API_KEY_GLOBAL" \
+            --header "Content-Type: application/json" \
+            --data @"$temp_payload" \
+            --max-time "$TIMEOUT_GLOBAL" \
+            2>&1)
+        api_exit="$?"
+        
+        if [[ "$api_exit" -eq 0 ]]; then
+            # Save response to file for parsing
+            echo "$api_response" > "$temp_response"
+            
+            # Extract content from response
+            enhanced_content=$(jq -r '.candidates[0].content.parts[0].text // empty' "$temp_response" 2>/dev/null || echo "")
+            
+            if [[ -n "$enhanced_content" && "$enhanced_content" != "null" && "$enhanced_content" != "empty" ]]; then
+                echo "✅ Success with model: $model" >&2
+                echo "$enhanced_content"
+                cleanup_temps
+                return 0
+            else
+                echo "⚠️  Model $model returned empty response" >&2
+                # Debug output for troubleshooting
+                if [[ -s "$temp_response" ]]; then
+                    echo "Response preview: $(head -200 "$temp_response")" >&2
+                fi
+            fi
+        else
+            echo "❌ Model $model API call failed: $api_response" >&2
+        fi
+    done
+    
+    echo "Error: All Gemini models failed" >&2
+    cleanup_temps
+    return 1
+}
+
+# Main execution
+function main() {
+    check_dependencies
+    load_config
+    validate_inputs "$@"
+    read_input_content
+    process_image_file
+    create_enhanced_prompt
+    call_gemini_api
+}
+
+main "$@"

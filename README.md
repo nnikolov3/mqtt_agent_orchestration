@@ -55,21 +55,32 @@ Production-ready autonomous AI agent orchestration system using MQTT for communi
 
 ## Quick Start & Demonstration
 
-### 1. Prerequisites Verification
+### 1. Prerequisites
+
+- **Go 1.24+** - [Install Go](https://golang.org/dl/)
+- **MQTT Broker** - Mosquitto or any MQTT broker
+- **Optional: Qdrant** - Vector database for RAG functionality
+- **Optional: GPU** - For local model acceleration
 
 ```bash
-# Check system dependencies
-go version  # Requires Go 1.24+
-mosquitto_pub --help  # MQTT broker
-nvidia-smi  # GPU for local models (optional)
-curl http://localhost:6333/health  # Qdrant (optional)
+# Verify Go installation
+go version
+
+# Check MQTT broker availability
+mosquitto_pub --help || echo "Install mosquitto: apt install mosquitto-clients"
+
+# Optional: Check GPU for local models
+nvidia-smi || echo "GPU not available - will use CPU mode"
 ```
 
 ### 2. Build System
 
 ```bash
-git clone <this-repo>
+git clone <repository-url>
 cd mqtt_agent_orchestration
+
+# Download dependencies
+go mod download
 
 # Build all components
 ./scripts/build.sh
@@ -79,24 +90,37 @@ ls bin/
 # Expected: orchestrator, role-worker, client, rag-service
 ```
 
-### 3. Start Core Services
+### 3. Configuration Setup
+
+```bash
+# Copy example configurations
+cp configs/ai_helpers.toml.example configs/ai_helpers.toml
+cp configs/models.yaml.example configs/models.yaml
+
+# Edit configurations with your API keys and paths
+editor configs/ai_helpers.toml
+editor configs/models.yaml
+```
+
+### 4. Start Core Services
 
 ```bash
 # Terminal 1: Start MQTT broker
-sudo systemctl start mosquitto
-# OR manually: mosquitto -v
+mosquitto -v
+# OR if using systemd: sudo systemctl start mosquitto
 
-# Terminal 2: Start Qdrant (optional but recommended)
-docker run -p 6333:6333 qdrant/qdrant
+# Terminal 2: Optional - Start Qdrant for RAG
+docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
+# OR use binary: ./bin/qdrant
 
 # Terminal 3: Start orchestrator
-./bin/orchestrator --mqtt-host localhost --mqtt-port 1883 --verbose
+./bin/orchestrator --config configs/orchestrator.yaml --verbose
 
 # Terminal 4: Start role workers
-./bin/role-worker --role developer --id dev-1 --mqtt-host localhost &
-./bin/role-worker --role reviewer --id rev-1 --mqtt-host localhost &
-./bin/role-worker --role approver --id app-1 --mqtt-host localhost &
-./bin/role-worker --role tester --id test-1 --mqtt-host localhost &
+./bin/role-worker --role developer --config configs/worker.yaml &
+./bin/role-worker --role reviewer --config configs/worker.yaml &
+./bin/role-worker --role approver --config configs/worker.yaml &
+./bin/role-worker --role tester --config configs/worker.yaml &
 ```
 
 ## Feature Demonstrations
@@ -211,29 +235,29 @@ export GEMINI_API_KEY="your-key"
 
 ## Configuration Files
 
-### `/data/models/` Structure
+### Local Models Directory Structure
 ```
-/data/models/
+${LOCAL_MODELS_PATH}/
 ├── Qwen3-Embedding-4B-Q8_0.gguf          # Vector embeddings (2560-dim)
 ├── Qwen2.5-Omni-3B-Q8_0.gguf            # Text generation  
-├── Qwen2.5-VL-7B-Abliterated-Caption-it.Q8_0.gguf  # Multimodal
+├── Qwen2.5-VL-7B-Q8_0.gguf              # Multimodal vision-language
 ├── llava-llama-3-8b-v1_1-int4.gguf       # Alternative multimodal
-└── MiMo-VL-7B-RL-Q8_0.gguf               # Vision-language model
+└── models/                                # Additional models directory
 ```
 
 ### `configs/models.yaml`
 ```yaml
 models:
   qwen-embedding-4b:
-    binary_path: "${LLAMA_SERVER_PATH:-/home/niko/bin/llama-server}"
-    model_path: "${LOCAL_MODELS_PATH:-/data/models}/Qwen3-Embedding-4B-Q8_0.gguf"
+    binary_path: "${LLAMA_SERVER_PATH}"
+    model_path: "${LOCAL_MODELS_PATH}/Qwen3-Embedding-4B-Q8_0.gguf"
     type: "embedding"
     gpu_layers: 20
     memory_limit: 5500
     specializations: ["embeddings", "vector_generation"]
 
 manager:
-  max_gpu_memory: 5632  # RTX 3060 5.5GB + 256MB buffer
+  max_gpu_memory: 6144  # Adjust based on your GPU
   monitor_interval: "30s"
   
 fallback:
@@ -242,7 +266,7 @@ fallback:
   task_complexity_threshold: "medium"
 ```
 
-### `~/.claude/claude_helpers.toml` Integration
+### `configs/ai_helpers.toml`
 ```toml
 [cerebras]
 api_key_variable = "CEREBRAS_API_KEY"
@@ -252,7 +276,16 @@ description = "Fast code analysis, review, and generation"
 [nvidia]  
 api_key_variable = "NVIDIA_API_KEY"
 models = ["nvidia/llama-3.3-nemotron-super-49b-v1.5", "openai/gpt-oss-120b"]
-description = "Multimodal analysis including OCR"
+description = "High-quality text generation and reasoning"
+
+[nvidia_ocr]
+api_key_variable = "NVIDIA_API_KEY" 
+models = ["nvidia/nemoretriever-ocr-v1"]
+description = "OCR service for text extraction from images"
+
+[defaults]
+response_dir = "./logs/ai_responses"
+retry_count = 3
 ```
 
 ## Testing & Verification

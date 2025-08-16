@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
 // APIConfig represents configuration for external AI APIs
@@ -30,83 +32,57 @@ type DefaultsConfig struct {
 
 // AIHelperConfig represents the complete AI helper configuration
 type AIHelperConfig struct {
-	Cerebras APIConfig      `toml:"cerebras" yaml:"cerebras"`
-	Nvidia   APIConfig      `toml:"nvidia" yaml:"nvidia"`
-	Gemini   APIConfig      `toml:"gemini" yaml:"gemini"`
-	Grok     APIConfig      `toml:"grok" yaml:"grok"`
-	Groq     APIConfig      `toml:"groq" yaml:"groq"`
-	Defaults DefaultsConfig `toml:"defaults" yaml:"defaults"`
+	Cerebras  APIConfig      `toml:"cerebras" yaml:"cerebras"`
+	Nvidia    APIConfig      `toml:"nvidia" yaml:"nvidia"`
+	NvidiaOCR APIConfig      `toml:"nvidia_ocr" yaml:"nvidia_ocr"`
+	Gemini    APIConfig      `toml:"gemini" yaml:"gemini"`
+	Grok      APIConfig      `toml:"grok" yaml:"grok"`
+	Groq      APIConfig      `toml:"groq" yaml:"groq"`
+	Defaults  DefaultsConfig `toml:"defaults" yaml:"defaults"`
 }
 
 // LoadAIHelperConfig loads AI helper configuration from TOML file
 func LoadAIHelperConfig(configPath string) (*AIHelperConfig, error) {
-	// Following "Do more with less" - use hardcoded config that matches claude_helpers.toml
-	// Real implementation would use a TOML parser, but this works for our use case
 	var config AIHelperConfig
 
-	// Set default values based on the TOML content
-	config = AIHelperConfig{
-		Cerebras: APIConfig{
-			APIKeyVariable: "CEREBRAS_API_KEY",
-			Models:         []string{"gpt-oss-120b", "qwen-3-coder-480b", "qwen-3-32b", "llama-3.3-70b"},
-			MaxTokens:      4000,
-			Temperature:    0.1,
-			TopP:           0.95,
-			Timeout:        60,
-			APIURL:         "https://api.cerebras.ai/v1/chat/completions",
-			Description:    "Fast code analysis, review, and generation",
-		},
-		Nvidia: APIConfig{
-			APIKeyVariable: "NVIDIA_API_KEY",
-			Models:         []string{"nvidia/llama-3.3-nemotron-super-49b-v1.5", "openai/gpt-oss-120b", "nvidia/nemotron-4-340b-instruct"},
-			MaxTokens:      65536,
-			Temperature:    0.6,
-			TopP:           0.95,
-			Timeout:        90,
-			APIURL:         "https://integrate.api.nvidia.com/v1/chat/completions",
-			OCRURL:         "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1",
-			Description:    "Multimodal analysis including OCR",
-		},
-		Gemini: APIConfig{
-			APIKeyVariable: "GEMINI_API_KEY",
-			Models:         []string{"gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"},
-			MaxTokens:      8192,
-			Temperature:    0.1,
-			TopP:           0.95,
-			Timeout:        120,
-			APIURL:         "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-			Description:    "Comprehensive multimodal analysis with large context",
-		},
-		Grok: APIConfig{
-			APIKeyVariable: "GROK_API_KEY",
-			Models:         []string{"grok-4-0709", "grok-3", "grok-3-mini"},
-			MaxTokens:      8192,
-			Temperature:    0.2,
-			TopP:           0.9,
-			Timeout:        120,
-			APIURL:         "https://api.x.ai/v1/chat/completions",
-			Description:    "Creative solutions and multimodal analysis",
-		},
-		Groq: APIConfig{
-			APIKeyVariable: "GROQ_API_KEY",
-			Models:         []string{"moonshotai/kimi-k2-instruct", "llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b"},
-			MaxTokens:      4096,
-			Temperature:    0.1,
-			TopP:           0.95,
-			Timeout:        30,
-			APIURL:         "https://api.groq.com/openai/v1/chat/completions",
-			Description:    "Ultra-fast inference for speed-critical tasks",
-		},
-		Defaults: DefaultsConfig{
-			RetryCount:    3,
-			RetryDelay:    2,
-			LogRequests:   false,
-			SaveResponses: false,
-			ResponseDir:   "/tmp/ai_responses",
-		},
+	// Read and parse TOML file - following design principles: "Never hard code values"
+	_, err := toml.DecodeFile(configPath, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AI helper config from %s: %w", configPath, err)
+	}
+
+	// Validate required fields
+	if err := validateConfig(&config); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return &config, nil
+}
+
+// validateConfig ensures all required configuration fields are present
+func validateConfig(config *AIHelperConfig) error {
+	providers := map[string]APIConfig{
+		"cerebras":   config.Cerebras,
+		"nvidia":     config.Nvidia,
+		"nvidia_ocr": config.NvidiaOCR,
+		"gemini":     config.Gemini,
+		"grok":       config.Grok,
+		"groq":       config.Groq,
+	}
+
+	for name, provider := range providers {
+		if provider.APIKeyVariable == "" {
+			return fmt.Errorf("missing api_key_variable for %s", name)
+		}
+		if len(provider.Models) == 0 {
+			return fmt.Errorf("missing models for %s", name)
+		}
+		if provider.APIURL == "" {
+			return fmt.Errorf("missing api_url for %s", name)
+		}
+	}
+
+	return nil
 }
 
 // GetAPIKey retrieves the API key for a provider from environment
@@ -138,6 +114,9 @@ func (c *AIHelperConfig) GetAvailableAPIs() map[string]APIConfig {
 	}
 	if c.Nvidia.IsAvailable() {
 		apis["nvidia"] = c.Nvidia
+	}
+	if c.NvidiaOCR.IsAvailable() {
+		apis["nvidia_ocr"] = c.NvidiaOCR
 	}
 	if c.Gemini.IsAvailable() {
 		apis["gemini"] = c.Gemini

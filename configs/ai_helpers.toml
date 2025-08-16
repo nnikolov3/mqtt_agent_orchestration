@@ -1,0 +1,75 @@
+# AI Helper Scripts Configuration
+# Configuration for AI API providers used by the MQTT Agent Orchestration System
+
+[cerebras]
+api_key_variable = "CEREBRAS_API_KEY"
+# Priority order: Use gpt-oss-120b first for better reasoning, then fallback models
+models = ["gpt-oss-120b", "qwen-3-coder-480b", "qwen-3-32b", "llama-3.3-70b"]
+max_tokens = 4000
+temperature = 0.1
+top_p = 0.95
+timeout = 60
+api_url = "https://api.cerebras.ai/v1/chat/completions"
+description = "Fast code analysis, review, and generation. Use gpt-oss-120b for complex reasoning, fallback to specialized coder models."
+
+[nvidia]
+api_key_variable = "NVIDIA_API_KEY"
+# NVIDIA text generation models - NOT OCR
+models = ["nvidia/llama-3.3-nemotron-super-49b-v1.5", "openai/gpt-oss-120b", "nvidia/nemotron-4-340b-instruct", "meta/llama-3.1-8b-instruct"]
+max_tokens = 65536
+temperature = 0.6
+top_p = 0.95
+timeout = 90
+api_url = "https://integrate.api.nvidia.com/v1/chat/completions"
+description = "High-quality text generation and reasoning. Nemotron models excel at complex analysis and code generation."
+
+[nvidia_ocr]
+api_key_variable = "NVIDIA_API_KEY"
+# NVIDIA OCR service - separate from text generation
+models = ["nvidia/nemoretriever-ocr-v1"]
+max_tokens = 8192
+temperature = 0.1
+top_p = 0.95
+timeout = 60
+api_url = "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1"
+description = "OCR service for extracting text from images. Use specifically for document processing and visual text extraction."
+
+[gemini]
+api_key_variable = "GEMINI_API_KEY"
+# Prioritize intelligence (pro) for complex tasks, then speed (flash) for quick tasks
+models = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+max_tokens = 8192
+temperature = 0.1
+top_p = 0.95
+timeout = 120
+api_url = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+description = "Comprehensive multimodal analysis with large context. Use gemini-2.5-pro for complex architecture review and detailed analysis."
+
+[grok]
+api_key_variable = "GROK_API_KEY"
+# Include premium grok-4-0709 for complex multimodal tasks, fallback to cost-effective models
+models = ["grok-4-0709", "grok-3", "grok-3-mini"]
+max_tokens = 8192
+temperature = 0.2
+top_p = 0.9
+timeout = 120
+api_url = "https://api.x.ai/v1/chat/completions"
+description = "Creative solutions and multimodal analysis. Premium grok-4-0709 for complex tasks, grok-3-mini for cost-effective quick tasks."
+
+[groq]
+api_key_variable = "GROQ_API_KEY"
+# Include Moonshot's kimi-k2-instruct model for enhanced analysis capabilities
+models = ["moonshotai/kimi-k2-instruct", "llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b", "llama3-70b-8192", "llama-3.1-8b-instant"]
+max_tokens = 4096
+temperature = 0.1
+top_p = 0.95
+timeout = 30
+api_url = "https://api.groq.com/openai/v1/chat/completions"
+description = "Ultra-fast inference with kimi-k2-instruct for enhanced analysis. Excellent for speed-critical tasks and rapid iterations."
+
+[defaults]
+retry_count = 3
+retry_delay = 2
+log_requests = false
+save_responses = false
+response_dir = "./logs/ai_responses"

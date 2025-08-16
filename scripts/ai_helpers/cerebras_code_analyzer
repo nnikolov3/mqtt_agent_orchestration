@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+
+# Design: Helper script for Claude Code to use Cerebras AI for code analysis
+# Purpose: Code review, generation, and technical analysis using Cerebras API
+# Usage: cerebras_code_analyzer.sh "prompt" [input_file]
+
+set -euo pipefail
+
+# ALL global variables declared at top
+declare SCRIPT_DIR=""
+declare CONFIG_FILE_GLOBAL=""
+declare CEREBRAS_API_KEY_GLOBAL=""
+declare -a CEREBRAS_MODELS_GLOBAL=()
+declare MAX_TOKENS_GLOBAL=""
+declare TEMPERATURE_GLOBAL=""
+declare TOP_P_GLOBAL=""
+declare API_URL_GLOBAL=""
+declare TIMEOUT_GLOBAL=""
+declare prompt_text=""
+declare input_file=""
+declare input_content=""
+declare full_prompt=""
+declare temp_payload=""
+declare temp_response=""
+declare model=""
+declare api_response=""
+declare api_exit=""
+declare enhanced_content=""
+
+# Initialize variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Handle both direct execution and symlink execution
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    # Script is symlinked, find the real location
+    REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+    REAL_DIR="$(dirname "$REAL_SCRIPT")"
+    CONFIG_FILE_GLOBAL="$REAL_DIR/claude_helpers.toml"
+else
+    # Script executed directly
+    CONFIG_FILE_GLOBAL="$SCRIPT_DIR/claude_helpers.toml"
+fi
+
+# Load configuration from TOML file
+function load_config() {
+    if [[ ! -f "$CONFIG_FILE_GLOBAL" ]]; then
+        echo "Error: Configuration file not found: $CONFIG_FILE_GLOBAL" >&2
+        exit 1
+    fi
+    
+    # Check if yq is available
+    if ! command -v yq >/dev/null; then
+        echo "Error: yq is required to parse TOML configuration" >&2
+        exit 1
+    fi
+    
+    # Load Cerebras configuration
+    local api_key_var=""
+    api_key_var=$(yq '.cerebras.api_key_variable' "$CONFIG_FILE_GLOBAL")
+    MAX_TOKENS_GLOBAL=$(yq '.cerebras.max_tokens' "$CONFIG_FILE_GLOBAL")
+    TEMPERATURE_GLOBAL=$(yq '.cerebras.temperature' "$CONFIG_FILE_GLOBAL")
+    TOP_P_GLOBAL=$(yq '.cerebras.top_p' "$CONFIG_FILE_GLOBAL")
+    API_URL_GLOBAL=$(yq '.cerebras.api_url' "$CONFIG_FILE_GLOBAL")
+    TIMEOUT_GLOBAL=$(yq '.cerebras.timeout' "$CONFIG_FILE_GLOBAL")
+    
+    # Load models array
+    local models_count=""
+    models_count=$(yq '.cerebras.models | length' "$CONFIG_FILE_GLOBAL")
+    for ((i=0; i<models_count; i++)); do
+        CEREBRAS_MODELS_GLOBAL+=("$(yq ".cerebras.models[$i]" "$CONFIG_FILE_GLOBAL")")
+    done
+    
+    # Load API key from environment variable
+    if [[ -n "${!api_key_var:-}" ]]; then
+        CEREBRAS_API_KEY_GLOBAL="${!api_key_var}"
+    else
+        echo "Error: Environment variable $api_key_var is not set" >&2
+        exit 1
+    fi
+}
+
+# Check dependencies
+function check_dependencies() {
+    local dep=""
+    local -a required_deps=("curl" "jq" "mktemp" "yq")
+    
+    for dep in "${required_deps[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            echo "Error: Required dependency not found: $dep" >&2
+            exit 1
+        fi
+    done
+}
+
+# Validate input parameters
+function validate_inputs() {
+    if [[ $# -lt 1 || $# -gt 2 ]]; then
+        echo "Usage: $0 \"prompt\" [input_file]" >&2
+        echo "Examples:" >&2
+        echo "  $0 \"Review this Go code for best practices\"" >&2
+        echo "  $0 \"Explain this function\" main.go" >&2
+        echo "  $0 \"Generate unit tests\" < code.go" >&2
+        exit 1
+    fi
+    
+    prompt_text="$1"
+    input_file="${2:-}"
+    
+    if [[ -z "$prompt_text" ]]; then
+        echo "Error: Prompt cannot be empty" >&2
+        exit 1
+    fi
+}
+
+# Read input content from file or stdin
+function read_input_content() {
+    if [[ -n "$input_file" ]]; then
+        if [[ ! -f "$input_file" ]]; then
+            echo "Error: Input file does not exist: $input_file" >&2
+            exit 1
+        fi
+        input_content=$(cat "$input_file")
+    elif [[ ! -t 0 ]]; then
+        # Read from stdin if available
+        input_content=$(cat)
+    else
+        input_content=""
+    fi
+}
+
+# Create enhanced prompt with context
+function create_enhanced_prompt() {
+    if [[ -n "$input_content" ]]; then
+        full_prompt="$prompt_text
+
+Code/Content to analyze:
+\`\`\`
+$input_content
+\`\`\`
+
+Please provide a detailed analysis following best practices for code quality, security, and maintainability."
+    else
+        full_prompt="$prompt_text
+
+Please provide detailed technical guidance and follow coding best practices."
+    fi
+}
+
+# Call Cerebras API with model fallback
+function call_cerebras_api() {
+    local model_index=0
+    local curl_exit=""
+    
+    # Create temporary files
+    temp_payload=$(mktemp)
+    temp_response=$(mktemp)
+    
+    # Cleanup function
+    function cleanup_temps() {
+        rm -f "$temp_payload" "$temp_response"
+    }
+    trap cleanup_temps EXIT
+    
+    for model in "${CEREBRAS_MODELS_GLOBAL[@]}"; do
+        model_index=$((model_index + 1))
+        echo "Trying Cerebras model: $model ($model_index/${#CEREBRAS_MODELS_GLOBAL[@]})" >&2
+        
+        # Create JSON payload
+        jq -n \
+            --arg model "$model" \
+            --arg prompt "$full_prompt" \
+            --arg max_tokens "$MAX_TOKENS_GLOBAL" \
+            --arg temperature "$TEMPERATURE_GLOBAL" \
+            --arg top_p "$TOP_P_GLOBAL" '{
+                "model": $model,
+                "messages": [{"role": "user", "content": $prompt}],
+                "max_tokens": ($max_tokens | tonumber),
+                "temperature": ($temperature | tonumber),
+                "top_p": ($top_p | tonumber),
+                "stream": false
+            }' > "$temp_payload"
+        
+        # Make API call
+        api_response=$(curl -sS \
+            --location "$API_URL_GLOBAL" \
+            --header "Content-Type: application/json" \
+            --header "Authorization: Bearer $CEREBRAS_API_KEY_GLOBAL" \
+            --data @"$temp_payload" \
+            --max-time "$TIMEOUT_GLOBAL" \
+            2>&1)
+        api_exit="$?"
+        
+        if [[ "$api_exit" -eq 0 ]]; then
+            # Save response to file for parsing
+            echo "$api_response" > "$temp_response"
+            
+            # Extract content from response
+            enhanced_content=$(jq -r '.choices[0].message.content // empty' "$temp_response" 2>/dev/null || echo "")
+            
+            if [[ -n "$enhanced_content" && "$enhanced_content" != "null" && "$enhanced_content" != "empty" ]]; then
+                echo "✅ Success with model: $model" >&2
+                echo "$enhanced_content"
+                cleanup_temps
+                return 0
+            else
+                echo "⚠️  Model $model returned empty response" >&2
+                # Debug output for troubleshooting
+                if [[ -s "$temp_response" ]]; then
+                    echo "Response preview: $(head -200 "$temp_response")" >&2
+                fi
+            fi
+        else
+            echo "❌ Model $model API call failed: $api_response" >&2
+        fi
+    done
+    
+    echo "Error: All Cerebras models failed" >&2
+    cleanup_temps
+    return 1
+}
+
+# Main execution
+function main() {
+    check_dependencies
+    load_config
+    validate_inputs "$@"
+    read_input_content
+    create_enhanced_prompt
+    call_cerebras_api
+}
+
+main "$@"

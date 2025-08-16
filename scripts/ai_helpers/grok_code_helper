@@ -1,0 +1,298 @@
+#!/usr/bin/env bash
+
+# Design: Helper script for Claude Code to use Grok AI for quick code assistance
+# Purpose: Fast problem solving, brainstorming, and creative coding solutions using Grok API
+# Usage: grok_code_helper.sh "prompt" [input_file] [image_file]
+
+set -euo pipefail
+
+# ALL global variables declared at top
+declare SCRIPT_DIR=""
+declare CONFIG_FILE_GLOBAL=""
+declare GROK_API_KEY_GLOBAL=""
+declare -a GROK_MODELS_GLOBAL=()
+declare MAX_TOKENS_GLOBAL=""
+declare TEMPERATURE_GLOBAL=""
+declare TOP_P_GLOBAL=""
+declare API_URL_GLOBAL=""
+declare TIMEOUT_GLOBAL=""
+declare prompt_text=""
+declare input_file=""
+declare image_file=""
+declare input_content=""
+declare image_base64=""
+declare full_prompt=""
+declare temp_payload=""
+declare temp_response=""
+declare model=""
+declare api_response=""
+declare api_exit=""
+declare enhanced_content=""
+
+# Initialize variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Handle both direct execution and symlink execution
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    # Script is symlinked, find the real location
+    REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+    REAL_DIR="$(dirname "$REAL_SCRIPT")"
+    CONFIG_FILE_GLOBAL="$REAL_DIR/claude_helpers.toml"
+else
+    # Script executed directly
+    CONFIG_FILE_GLOBAL="$SCRIPT_DIR/claude_helpers.toml"
+fi
+
+# Load configuration from TOML file
+function load_config() {
+    if [[ ! -f "$CONFIG_FILE_GLOBAL" ]]; then
+        echo "Error: Configuration file not found: $CONFIG_FILE_GLOBAL" >&2
+        exit 1
+    fi
+    
+    # Check if yq is available
+    if ! command -v yq >/dev/null; then
+        echo "Error: yq is required to parse TOML configuration" >&2
+        exit 1
+    fi
+    
+    # Load Grok configuration
+    local api_key_var=""
+    api_key_var=$(yq '.grok.api_key_variable' "$CONFIG_FILE_GLOBAL")
+    MAX_TOKENS_GLOBAL=$(yq '.grok.max_tokens' "$CONFIG_FILE_GLOBAL")
+    TEMPERATURE_GLOBAL=$(yq '.grok.temperature' "$CONFIG_FILE_GLOBAL")
+    TOP_P_GLOBAL=$(yq '.grok.top_p' "$CONFIG_FILE_GLOBAL")
+    API_URL_GLOBAL=$(yq '.grok.api_url' "$CONFIG_FILE_GLOBAL")
+    TIMEOUT_GLOBAL=$(yq '.grok.timeout' "$CONFIG_FILE_GLOBAL")
+    
+    # Load models array
+    local models_count=""
+    models_count=$(yq '.grok.models | length' "$CONFIG_FILE_GLOBAL")
+    for ((i=0; i<models_count; i++)); do
+        GROK_MODELS_GLOBAL+=("$(yq ".grok.models[$i]" "$CONFIG_FILE_GLOBAL")")
+    done
+    
+    # Load API key from environment variable
+    if [[ -n "${!api_key_var:-}" ]]; then
+        GROK_API_KEY_GLOBAL="${!api_key_var}"
+    else
+        echo "Error: Environment variable $api_key_var is not set" >&2
+        exit 1
+    fi
+}
+
+# Check dependencies
+function check_dependencies() {
+    local dep=""
+    local -a required_deps=("curl" "jq" "mktemp" "base64" "yq" "file")
+    
+    for dep in "${required_deps[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            echo "Error: Required dependency not found: $dep" >&2
+            exit 1
+        fi
+    done
+}
+
+# Validate input parameters
+function validate_inputs() {
+    if [[ $# -lt 1 || $# -gt 3 ]]; then
+        echo "Usage: $0 \"prompt\" [input_file] [image_file]" >&2
+        echo "Examples:" >&2
+        echo "  $0 \"Suggest 3 ways to optimize this function\" slow_func.go" >&2
+        echo "  $0 \"What's wrong with this code?\" buggy_code.py" >&2
+        echo "  $0 \"Creative solutions for this problem\" < requirements.txt" >&2
+        echo "  $0 \"Analyze this error screenshot\" logs.txt error.png" >&2
+        exit 1
+    fi
+    
+    prompt_text="$1"
+    input_file="${2:-}"
+    image_file="${3:-}"
+    
+    if [[ -z "$prompt_text" ]]; then
+        echo "Error: Prompt cannot be empty" >&2
+        exit 1
+    fi
+}
+
+# Read input content from file or stdin
+function read_input_content() {
+    if [[ -n "$input_file" ]]; then
+        if [[ ! -f "$input_file" ]]; then
+            echo "Error: Input file does not exist: $input_file" >&2
+            exit 1
+        fi
+        input_content=$(cat "$input_file")
+    elif [[ ! -t 0 ]]; then
+        # Read from stdin if available
+        input_content=$(cat)
+    else
+        input_content=""
+    fi
+}
+
+# Process image file if provided
+function process_image_file() {
+    if [[ -n "$image_file" ]]; then
+        if [[ ! -f "$image_file" ]]; then
+            echo "Error: Image file does not exist: $image_file" >&2
+            exit 1
+        fi
+        
+        # Check if file is an image
+        if ! file "$image_file" | grep -q -E "(image|bitmap)"; then
+            echo "Error: File is not a recognized image format: $image_file" >&2
+            exit 1
+        fi
+        
+        # Convert image to base64
+        image_base64=$(base64 -w 0 "$image_file")
+        if [[ -z "$image_base64" ]]; then
+            echo "Error: Failed to encode image as base64" >&2
+            exit 1
+        fi
+    fi
+}
+
+# Create enhanced prompt for creative problem solving
+function create_enhanced_prompt() {
+    local content_section=""
+    
+    if [[ -n "$input_content" ]]; then
+        content_section="Code/Content to analyze:
+\`\`\`
+$input_content
+\`\`\`
+
+"
+    fi
+    
+    if [[ -n "$image_file" ]]; then
+        full_prompt="$prompt_text
+
+${content_section}Visual context provided in image: $image_file
+
+Please provide creative, practical solutions. Think outside the box while maintaining code quality. Consider:
+1. Alternative approaches and patterns
+2. Performance optimizations
+3. Elegant simplifications
+4. Modern best practices
+5. Creative debugging techniques
+6. Integration possibilities"
+    else
+        full_prompt="$prompt_text
+
+${content_section}Please provide creative, practical solutions with clear explanations. Focus on actionable advice and innovative approaches while maintaining code quality."
+    fi
+}
+
+# Call Grok API with model fallback
+function call_grok_api() {
+    local model_index=0
+    local curl_exit=""
+    
+    # Create temporary files
+    temp_payload=$(mktemp)
+    temp_response=$(mktemp)
+    
+    # Cleanup function
+    function cleanup_temps() {
+        rm -f "$temp_payload" "$temp_response"
+    }
+    trap cleanup_temps EXIT
+    
+    for model in "${GROK_MODELS_GLOBAL[@]}"; do
+        model_index=$((model_index + 1))
+        echo "Trying Grok model: $model ($model_index/${#GROK_MODELS_GLOBAL[@]})" >&2
+        
+        # Create message content based on whether we have an image
+        if [[ -n "$image_base64" ]]; then
+            # Multimodal message with image (for grok-vision-beta)
+            jq -n \
+                --arg model "$model" \
+                --arg text "$full_prompt" \
+                --arg image_data "$image_base64" \
+                --arg max_tokens "$MAX_TOKENS_GLOBAL" \
+                --arg temperature "$TEMPERATURE_GLOBAL" \
+                --arg top_p "$TOP_P_GLOBAL" '{
+                    "model": $model,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": $text},
+                            {"type": "image_url", "image_url": {"url": ("data:image/jpeg;base64," + $image_data)}}
+                        ]
+                    }],
+                    "max_tokens": ($max_tokens | tonumber),
+                    "temperature": ($temperature | tonumber),
+                    "top_p": ($top_p | tonumber),
+                    "stream": false
+                }' > "$temp_payload"
+        else
+            # Text-only message
+            jq -n \
+                --arg model "$model" \
+                --arg prompt "$full_prompt" \
+                --arg max_tokens "$MAX_TOKENS_GLOBAL" \
+                --arg temperature "$TEMPERATURE_GLOBAL" \
+                --arg top_p "$TOP_P_GLOBAL" '{
+                    "model": $model,
+                    "messages": [{"role": "user", "content": $prompt}],
+                    "max_tokens": ($max_tokens | tonumber),
+                    "temperature": ($temperature | tonumber),
+                    "top_p": ($top_p | tonumber),
+                    "stream": false
+                }' > "$temp_payload"
+        fi
+        
+        # Make API call
+        api_response=$(curl -sS \
+            --location "$API_URL_GLOBAL" \
+            --header "Content-Type: application/json" \
+            --header "Authorization: Bearer $GROK_API_KEY_GLOBAL" \
+            --data @"$temp_payload" \
+            --max-time "$TIMEOUT_GLOBAL" \
+            2>&1)
+        api_exit="$?"
+        
+        if [[ "$api_exit" -eq 0 ]]; then
+            # Save response to file for parsing
+            echo "$api_response" > "$temp_response"
+            
+            # Extract content from response
+            enhanced_content=$(jq -r '.choices[0].message.content // empty' "$temp_response" 2>/dev/null || echo "")
+            
+            if [[ -n "$enhanced_content" && "$enhanced_content" != "null" && "$enhanced_content" != "empty" ]]; then
+                echo "✅ Success with model: $model" >&2
+                echo "$enhanced_content"
+                cleanup_temps
+                return 0
+            else
+                echo "⚠️  Model $model returned empty response" >&2
+                # Debug output for troubleshooting
+                if [[ -s "$temp_response" ]]; then
+                    echo "Response preview: $(head -200 "$temp_response")" >&2
+                fi
+            fi
+        else
+            echo "❌ Model $model API call failed: $api_response" >&2
+        fi
+    done
+    
+    echo "Error: All Grok models failed" >&2
+    cleanup_temps
+    return 1
+}
+
+# Main execution
+function main() {
+    check_dependencies
+    load_config
+    validate_inputs "$@"
+    read_input_content
+    process_image_file
+    create_enhanced_prompt
+    call_grok_api
+}
+
+main "$@"

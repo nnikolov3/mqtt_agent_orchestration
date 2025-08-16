@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+
+# Design: Helper script for Claude Code to use Groq AI for ultra-fast code analysis
+# Purpose: Lightning-fast code review, rapid iterations, and speed-critical analysis
+# Usage: groq_fast_analyzer "prompt" [input_file] [image_file]
+
+set -euo pipefail
+
+# ALL global variables declared at top
+declare SCRIPT_DIR=""
+declare CONFIG_FILE_GLOBAL=""
+declare GROQ_API_KEY_GLOBAL=""
+declare -a GROQ_MODELS_GLOBAL=()
+declare MAX_TOKENS_GLOBAL=""
+declare TEMPERATURE_GLOBAL=""
+declare TOP_P_GLOBAL=""
+declare API_URL_GLOBAL=""
+declare TIMEOUT_GLOBAL=""
+declare prompt_text=""
+declare input_file=""
+declare image_file=""
+declare input_content=""
+declare image_base64=""
+declare full_prompt=""
+declare temp_payload=""
+declare temp_response=""
+declare model=""
+declare api_response=""
+declare api_exit=""
+declare enhanced_content=""
+
+# Initialize variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Handle both direct execution and symlink execution
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    # Script is symlinked, find the real location
+    REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+    REAL_DIR="$(dirname "$REAL_SCRIPT")"
+    CONFIG_FILE_GLOBAL="$REAL_DIR/claude_helpers.toml"
+else
+    # Script executed directly
+    CONFIG_FILE_GLOBAL="$SCRIPT_DIR/claude_helpers.toml"
+fi
+
+# Load configuration from TOML file
+function load_config() {
+    if [[ ! -f "$CONFIG_FILE_GLOBAL" ]]; then
+        echo "Error: Configuration file not found: $CONFIG_FILE_GLOBAL" >&2
+        exit 1
+    fi
+    
+    # Check if yq is available
+    if ! command -v yq >/dev/null; then
+        echo "Error: yq is required to parse TOML configuration" >&2
+        exit 1
+    fi
+    
+    # Load Groq configuration
+    local api_key_var=""
+    api_key_var=$(yq '.groq.api_key_variable' "$CONFIG_FILE_GLOBAL")
+    MAX_TOKENS_GLOBAL=$(yq '.groq.max_tokens' "$CONFIG_FILE_GLOBAL")
+    TEMPERATURE_GLOBAL=$(yq '.groq.temperature' "$CONFIG_FILE_GLOBAL")
+    TOP_P_GLOBAL=$(yq '.groq.top_p' "$CONFIG_FILE_GLOBAL")
+    API_URL_GLOBAL=$(yq '.groq.api_url' "$CONFIG_FILE_GLOBAL")
+    TIMEOUT_GLOBAL=$(yq '.groq.timeout' "$CONFIG_FILE_GLOBAL")
+    
+    # Load models array
+    local models_count=""
+    models_count=$(yq '.groq.models | length' "$CONFIG_FILE_GLOBAL")
+    for ((i=0; i<models_count; i++)); do
+        GROQ_MODELS_GLOBAL+=("$(yq ".groq.models[$i]" "$CONFIG_FILE_GLOBAL")")
+    done
+    
+    # Load API key from environment variable
+    if [[ -n "${!api_key_var:-}" ]]; then
+        GROQ_API_KEY_GLOBAL="${!api_key_var}"
+    else
+        echo "Error: Environment variable $api_key_var is not set" >&2
+        exit 1
+    fi
+}
+
+# Check dependencies
+function check_dependencies() {
+    local dep=""
+    local -a required_deps=("curl" "jq" "mktemp" "yq")
+    
+    for dep in "${required_deps[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            echo "Error: Required dependency not found: $dep" >&2
+            exit 1
+        fi
+    done
+}
+
+# Validate input parameters
+function validate_inputs() {
+    if [[ $# -lt 1 || $# -gt 2 ]]; then
+        echo "Usage: $0 \"prompt\" [input_file]" >&2
+        echo "Examples:" >&2
+        echo "  $0 \"Quick code review\" main.go" >&2
+        echo "  $0 \"Find bugs fast\" < code.py" >&2
+        echo "  $0 \"Optimize this function\" function.js" >&2
+        exit 1
+    fi
+    
+    prompt_text="$1"
+    input_file="${2:-}"
+    
+    if [[ -z "$prompt_text" ]]; then
+        echo "Error: Prompt cannot be empty" >&2
+        exit 1
+    fi
+}
+
+# Read input content from file or stdin
+function read_input_content() {
+    if [[ -n "$input_file" ]]; then
+        if [[ ! -f "$input_file" ]]; then
+            echo "Error: Input file does not exist: $input_file" >&2
+            exit 1
+        fi
+        input_content=$(cat "$input_file")
+    elif [[ ! -t 0 ]]; then
+        # Read from stdin if available
+        input_content=$(cat)
+    else
+        input_content=""
+    fi
+}
+
+# Create enhanced prompt for fast analysis
+function create_enhanced_prompt() {
+    local content_section=""
+    
+    if [[ -n "$input_content" ]]; then
+        content_section="Code/Content to analyze:
+\`\`\`
+$input_content
+\`\`\`
+
+"
+    fi
+    
+    full_prompt="$prompt_text
+
+${content_section}Please provide fast, actionable analysis. Focus on:
+1. Key issues and quick fixes
+2. Performance optimizations  
+3. Best practices violations
+4. Security concerns
+5. Immediate improvements
+
+Be concise but thorough - optimized for rapid development cycles."
+}
+
+# Call Groq API with model fallback
+function call_groq_api() {
+    local model_index=0
+    local curl_exit=""
+    
+    # Create temporary files
+    temp_payload=$(mktemp)
+    temp_response=$(mktemp)
+    
+    # Cleanup function
+    function cleanup_temps() {
+        rm -f "$temp_payload" "$temp_response"
+    }
+    trap cleanup_temps EXIT
+    
+    for model in "${GROQ_MODELS_GLOBAL[@]}"; do
+        model_index=$((model_index + 1))
+        echo "Trying Groq model: $model ($model_index/${#GROQ_MODELS_GLOBAL[@]})" >&2
+        
+        # Create JSON payload
+        jq -n \
+            --arg model "$model" \
+            --arg prompt "$full_prompt" \
+            --arg max_tokens "$MAX_TOKENS_GLOBAL" \
+            --arg temperature "$TEMPERATURE_GLOBAL" \
+            --arg top_p "$TOP_P_GLOBAL" '{
+                "model": $model,
+                "messages": [{"role": "user", "content": $prompt}],
+                "max_tokens": ($max_tokens | tonumber),
+                "temperature": ($temperature | tonumber),
+                "top_p": ($top_p | tonumber),
+                "stream": false
+            }' > "$temp_payload"
+        
+        # Make API call
+        api_response=$(curl -sS \
+            --location "$API_URL_GLOBAL" \
+            --header "Content-Type: application/json" \
+            --header "Authorization: Bearer $GROQ_API_KEY_GLOBAL" \
+            --data @"$temp_payload" \
+            --max-time "$TIMEOUT_GLOBAL" \
+            2>&1)
+        api_exit="$?"
+        
+        if [[ "$api_exit" -eq 0 ]]; then
+            # Save response to file for parsing
+            echo "$api_response" > "$temp_response"
+            
+            # Extract content from response
+            enhanced_content=$(jq -r '.choices[0].message.content // empty' "$temp_response" 2>/dev/null || echo "")
+            
+            if [[ -n "$enhanced_content" && "$enhanced_content" != "null" && "$enhanced_content" != "empty" ]]; then
+                echo "⚡ Ultra-fast success with model: $model" >&2
+                echo "$enhanced_content"
+                cleanup_temps
+                return 0
+            else
+                echo "⚠️  Model $model returned empty response" >&2
+                # Debug output for troubleshooting
+                if [[ -s "$temp_response" ]]; then
+                    echo "Response preview: $(head -200 "$temp_response")" >&2
+                fi
+            fi
+        else
+            echo "❌ Model $model API call failed: $api_response" >&2
+        fi
+    done
+    
+    echo "Error: All Groq models failed" >&2
+    cleanup_temps
+    return 1
+}
+
+# Main execution
+function main() {
+    check_dependencies
+    load_config
+    validate_inputs "$@"
+    read_input_content
+    create_enhanced_prompt
+    call_groq_api
+}
+
+main "$@"

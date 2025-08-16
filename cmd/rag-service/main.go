@@ -18,7 +18,7 @@ import (
 const (
 	QdrantHost        = "localhost"
 	QdrantPort        = 6334 // gRPC port
-	CollectionName    = "claude_rag"
+	CollectionName    = "agent_rag"
 	EmbeddingDim      = 2560 // Qwen3-Embedding-4B dimensions
 	EmbeddingModel    = "./models/Qwen3-Embedding-4B-Q8_0.gguf"
 	LlamaEmbeddingBin = "/home/niko/bin/llama-embedding"
@@ -213,24 +213,52 @@ func handleRegister(service *RAGService, args []string) {
 }
 
 func handleStoreStandards(service *RAGService, args []string) {
-
-	// Read Claude standards
-	claudeStandards, err := os.ReadFile("/home/niko/.claude/CLAUDE.md")
-	if err != nil {
-		log.Fatalf("Failed to read Claude standards: %v", err)
+	standardsPath := "./standards"
+	if len(args) > 0 {
+		standardsPath = args[0]
 	}
 
-	bashStandards, err := os.ReadFile("/home/niko/.claude/BASH_CODING_STANDARD_CLAUDE.md")
+	// Read AI agent guidelines
+	agentStandards, err := os.ReadFile(standardsPath + "/AI_AGENT_GUIDELINES.md")
 	if err != nil {
-		log.Fatalf("Failed to read Bash standards: %v", err)
+		log.Printf("Warning: Failed to read AI agent guidelines: %v", err)
+		// Create a default guidelines document
+		agentStandards = []byte(`# AI Agent Guidelines
+
+## Core Principles
+- **Explicit over implicit**: Make intentions clear through code structure and naming
+- **Robust error handling**: All functions return explicit errors, no silent failures
+- **Maintainable code structure**: Single responsibility, clear interfaces
+- **Production readiness**: Comprehensive logging, monitoring, health checks
+
+## Agent Behavior Standards
+- Always validate inputs and handle edge cases
+- Log important operations and errors clearly
+- Follow established patterns and conventions
+- Fail fast with descriptive error messages
+- Use structured logging for observability`)
 	}
 
-	// Store Claude guidelines
-	claudeDoc := Document{
-		ID:      "claude_guidelines",
-		Content: string(claudeStandards),
+	bashStandards, err := os.ReadFile(standardsPath + "/BASH_CODING_STANDARD.md")
+	if err != nil {
+		log.Printf("Warning: Failed to read Bash standards: %v", err)
+		// Create a default bash standards document
+		bashStandards = []byte(`# Bash Coding Standards
+
+## Core Requirements
+- Use 'set -euo pipefail' for strict error handling
+- Quote all variables: "$var" not $var
+- Declare variables at top of scope
+- Use explicit error checking with captured exit codes
+- Follow consistent naming conventions`)
+	}
+
+	// Store AI agent guidelines
+	agentDoc := Document{
+		ID:      "ai_agent_guidelines",
+		Content: string(agentStandards),
 		Type:    "coding_standards",
-		Source:  "claude_system",
+		Source:  "system_guidelines",
 		Metadata: map[string]string{
 			"language":   "general",
 			"category":   "guidelines",
@@ -243,7 +271,7 @@ func handleStoreStandards(service *RAGService, args []string) {
 		ID:      "bash_standards",
 		Content: string(bashStandards),
 		Type:    "coding_standards",
-		Source:  "claude_system",
+		Source:  "system_guidelines",
 		Metadata: map[string]string{
 			"language":   "bash",
 			"category":   "standards",
@@ -251,9 +279,9 @@ func handleStoreStandards(service *RAGService, args []string) {
 		},
 	}
 
-	err = service.storeDocument(claudeDoc)
+	err = service.storeDocument(agentDoc)
 	if err != nil {
-		log.Fatalf("Failed to store Claude standards: %v", err)
+		log.Fatalf("Failed to store AI agent guidelines: %v", err)
 	}
 
 	err = service.storeDocument(bashDoc)
@@ -261,7 +289,7 @@ func handleStoreStandards(service *RAGService, args []string) {
 		log.Fatalf("Failed to store Bash standards: %v", err)
 	}
 
-	fmt.Println("Stored Claude and Bash coding standards in Qdrant")
+	fmt.Println("Stored AI agent guidelines and coding standards in Qdrant")
 }
 
 func handleSearch(service *RAGService, args []string) {

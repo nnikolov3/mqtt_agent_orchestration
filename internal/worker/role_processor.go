@@ -20,17 +20,21 @@ type RoleBasedProcessor struct {
 	modelManager    *localmodels.Manager
 	contentAnalyzer *ContentAnalyzer
 	aiClient        *ai.AIClient
+	taskRouter      *TaskRouter
 }
 
 // NewRoleBasedProcessor creates a processor for a specific role
-func NewRoleBasedProcessor(role types.WorkerRole, ragService *rag.Service, modelManager *localmodels.Manager, contentAnalyzer *ContentAnalyzer) *RoleBasedProcessor {
+func NewRoleBasedProcessor(role types.WorkerRole, ragService *rag.Service, modelManager *localmodels.Manager, contentAnalyzer *ContentAnalyzer, aiConfig *ai.AIHelperConfig) *RoleBasedProcessor {
 	capabilities := GetCapabilitiesForRole(role)
+	taskRouter := NewTaskRouter(modelManager, aiConfig)
+	
 	return &RoleBasedProcessor{
 		role:            role,
 		capabilities:    capabilities,
 		ragService:      ragService,
 		modelManager:    modelManager,
 		contentAnalyzer: contentAnalyzer,
+		taskRouter:      taskRouter,
 	}
 }
 
@@ -61,55 +65,36 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 		return "", fmt.Errorf("task requires role %s, but worker is %s", workflowTask.RequiredRole, p.role)
 	}
 
-	// Get system prompt for this role from RAG
-	var systemPrompt string
-	if p.ragService != nil {
-		prompt, err := p.ragService.GetSystemPrompt(ctx, p.role)
-		if err == nil {
-			systemPrompt = prompt
-		}
+	// Use task router to determine optimal execution strategy
+	execution, err := p.taskRouter.RouteTask(ctx, workflowTask)
+	if err != nil {
+		return "", fmt.Errorf("task routing failed: %w", err)
 	}
 
-	// Get relevant context if available
-	var ragContext string
+	// Log routing decision for monitoring
+	fmt.Printf("Task routed: %s (Strategy: %v, Model: %s, API: %s)\n", 
+		execution.Reasoning, execution.Strategy, execution.ModelName, execution.APIProvider)
+
+	// Get RAG context if enabled
 	if p.ragService != nil && p.capabilities.RAGEnabled {
-		context, err := p.ragService.GetRelevantContext(ctx, workflowTask.Type,
+		ragContext, err := p.ragService.GetRelevantContext(ctx, workflowTask.Type,
 			fmt.Sprintf("%s %s", workflowTask.Type, workflowTask.Payload["document_type"]))
 		if err == nil {
-			ragContext = context
+			// Add RAG context to task payload for execution
+			if workflowTask.Payload == nil {
+				workflowTask.Payload = make(map[string]string)
+			}
+			workflowTask.Payload["rag_context"] = ragContext
 		}
 	}
 
-	// Analyze content for optimal model selection
-	var modelAnalysis *AnalysisResult
-	if p.contentAnalyzer != nil {
-		analysis, err := p.contentAnalyzer.AnalyzeContent(ctx, workflowTask)
-		if err == nil {
-			modelAnalysis = analysis
-		}
+	// Execute using the determined strategy
+	result, err := execution.Execute(ctx, p.modelManager, p.aiClient)
+	if err != nil {
+		return "", fmt.Errorf("task execution failed: %w", err)
 	}
 
-	// Create enhanced task context for token optimization
-	taskContext := &EnhancedTaskContext{
-		SystemPrompt:  systemPrompt,
-		RAGContext:    ragContext,
-		Task:          workflowTask,
-		ModelAnalysis: modelAnalysis,
-	}
-
-	// Process based on role and task type
-	switch p.role {
-	case types.RoleDeveloper:
-		return p.processDeveloperTask(ctx, taskContext)
-	case types.RoleReviewer:
-		return p.processReviewerTask(ctx, taskContext)
-	case types.RoleApprover:
-		return p.processApproverTask(ctx, taskContext)
-	case types.RoleTester:
-		return p.processTesterTask(ctx, taskContext)
-	default:
-		return "", fmt.Errorf("unsupported role: %s", p.role)
-	}
+	return result, nil
 }
 
 // EnhancedTaskContext provides optimized context for AI API calls

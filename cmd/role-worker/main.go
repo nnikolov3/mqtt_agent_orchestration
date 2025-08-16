@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/niko/mqtt-agent-orchestration/internal/ai"
 	"github.com/niko/mqtt-agent-orchestration/internal/localmodels"
 	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
 	"github.com/niko/mqtt-agent-orchestration/internal/rag"
@@ -79,8 +80,14 @@ func NewRoleWorkerApp(workerID string, role types.WorkerRole, mqttHost string, m
 	// Create content analyzer
 	contentAnalyzer := worker.NewContentAnalyzer(modelConfigs)
 
+	// Load AI helper configuration
+	aiConfig, err := ai.LoadAIHelperConfig("./configs/ai_helpers.toml")
+	if err != nil {
+		log.Printf("Warning: Failed to load AI config, will use local models only: %v", err)
+	}
+
 	// Create role-based processor
-	processor := worker.NewRoleBasedProcessor(role, ragService, modelManager, contentAnalyzer)
+	processor := worker.NewRoleBasedProcessor(role, ragService, modelManager, contentAnalyzer, aiConfig)
 
 	return &RoleWorkerApp{
 		workerID:   workerID,
