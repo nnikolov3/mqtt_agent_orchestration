@@ -58,19 +58,23 @@ Production-ready autonomous AI agent orchestration system using MQTT for communi
 ### 1. Prerequisites
 
 - **Go 1.24+** - [Install Go](https://golang.org/dl/)
-- **MQTT Broker** - Mosquitto or any MQTT broker
-- **Optional: Qdrant** - Vector database for RAG functionality
-- **Optional: GPU** - For local model acceleration
+- **MQTT Broker** - Mosquitto (install via package manager)
+- **Qdrant** - Vector database (binary included in bin/)
+- **Local Models** - Any GGUF models in /data/models/ (llama.cpp compatible)
+- **GPU** - NVIDIA GPU recommended for model acceleration
 
 ```bash
 # Verify Go installation
 go version
 
-# Check MQTT broker availability
-mosquitto_pub --help || echo "Install mosquitto: apt install mosquitto-clients"
+# Install MQTT broker
+sudo apt install mosquitto mosquitto-clients
 
-# Optional: Check GPU for local models
-nvidia-smi || echo "GPU not available - will use CPU mode"
+# Check GPU for local models
+nvidia-smi
+
+# Verify model directory (any GGUF models work)
+ls /data/models/*.gguf
 ```
 
 ### 2. Build System
@@ -109,9 +113,8 @@ editor configs/models.yaml
 mosquitto -v
 # OR if using systemd: sudo systemctl start mosquitto
 
-# Terminal 2: Optional - Start Qdrant for RAG
-docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
-# OR use binary: ./bin/qdrant
+# Terminal 2: Start Qdrant for RAG
+./bin/qdrant
 
 # Terminal 3: Start orchestrator
 ./bin/orchestrator --config configs/orchestrator.yaml --verbose
@@ -237,13 +240,15 @@ export GEMINI_API_KEY="your-key"
 
 ### Local Models Directory Structure
 ```
-${LOCAL_MODELS_PATH}/
-├── Qwen3-Embedding-4B-Q8_0.gguf          # Vector embeddings (2560-dim)
-├── Qwen2.5-Omni-3B-Q8_0.gguf            # Text generation  
-├── Qwen2.5-VL-7B-Q8_0.gguf              # Multimodal vision-language
-├── llava-llama-3-8b-v1_1-int4.gguf       # Alternative multimodal
-└── models/                                # Additional models directory
+/data/models/
+├── *.gguf                                 # Any GGUF models supported by llama.cpp
+├── embedding models/                      # Vector embedding models
+├── text generation models/               # Language models for text generation
+├── multimodal models/                    # Vision-language models
+└── projector files/                      # Multimodal projector files (.mmproj)
 ```
+
+**Note**: This framework supports any GGUF models that llama.cpp can run. Users can modify the llama.cpp binaries and model configurations to suit their specific needs.
 
 ### `configs/models.yaml`
 ```yaml
