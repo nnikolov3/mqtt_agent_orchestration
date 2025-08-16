@@ -1,0 +1,120 @@
+# MCP (Model Context Protocol) Configuration
+# Enables local models to access external tools and services
+
+mcp:
+  # Qdrant MCP Server Configuration
+  qdrant:
+    enabled: true
+    server_url: "http://localhost:6333"
+    collection_name: "project_knowledge"
+    embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+    
+    # MCP Server settings (using official Qdrant MCP server)
+    mcp_server:
+      command: "uvx"
+      args: ["mcp-server-qdrant"]
+      transport: "sse"  # Server-Sent Events for remote connections
+      host: "localhost"
+      port: 8000
+      
+    # Environment variables for the MCP server
+    env:
+      QDRANT_URL: "http://localhost:6333"
+      COLLECTION_NAME: "project_knowledge"
+      EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+      TOOL_STORE_DESCRIPTION: "Store coding standards, documentation, and project knowledge for later retrieval. The 'information' parameter should contain a natural language description, while the actual content should be included in the 'metadata' parameter."
+      TOOL_FIND_DESCRIPTION: "Search for relevant coding standards, documentation, and project knowledge using semantic search. The 'query' parameter should describe what you're looking for."
+      
+    # Tool definitions (mapped to official Qdrant MCP server tools)
+    tools:
+      - name: "qdrant-store"
+        description: "Store information in Qdrant vector database"
+        parameters:
+          information:
+            type: "string"
+            description: "Information to store"
+          metadata:
+            type: "object"
+            description: "Optional metadata"
+          collection_name:
+            type: "string"
+            description: "Collection name (optional if default is set)"
+            
+      - name: "qdrant-find"
+        description: "Retrieve relevant information from Qdrant"
+        parameters:
+          query:
+            type: "string"
+            description: "Search query"
+          collection_name:
+            type: "string"
+            description: "Collection name (optional if default is set)"
+
+  # File System MCP Server
+  filesystem:
+    enabled: true
+    root_path: "/data"
+    allowed_paths:
+      - "/data/projects"
+      - "/data/models"
+      - "/data/qdrant"
+      
+    tools:
+      - name: "read_file"
+        description: "Read file contents"
+      - name: "write_file"
+        description: "Write content to file"
+      - name: "list_directory"
+        description: "List directory contents"
+
+  # Git MCP Server
+  git:
+    enabled: true
+    repository_path: "."
+    
+    tools:
+      - name: "get_changes"
+        description: "Get recent git changes"
+      - name: "commit_changes"
+        description: "Commit changes to git"
+      - name: "get_file_history"
+        description: "Get file change history"
+
+# MCP Client Configuration (for local models)
+client:
+  # Connection settings
+  connection:
+    timeout: "30s"
+    retry_attempts: 3
+    retry_delay: "5s"
+    
+  # Model integration
+  model_integration:
+    enable_tool_calling: true
+    max_tool_calls: 5
+    tool_timeout: "60s"
+    
+  # Logging
+  logging:
+    level: "info"
+    enable_debug: false
+    log_tool_calls: true
+
+# Security settings
+security:
+  # Authentication (if needed)
+  authentication:
+    enabled: false
+    token: ""
+    
+  # Access control
+  access_control:
+    allowed_models:
+      - "qwen-omni-3b"
+      - "qwen-vl-7b"
+      - "llava-llama-3-8b"
+      - "mimo-vl-7b"
+      
+    restricted_tools:
+      - "system_commands"
+      - "network_access"

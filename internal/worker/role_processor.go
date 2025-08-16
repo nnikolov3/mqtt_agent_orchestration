@@ -6,24 +6,31 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/niko/mqtt-agent-orchestration/internal/ai"
+	"github.com/niko/mqtt-agent-orchestration/internal/localmodels"
 	"github.com/niko/mqtt-agent-orchestration/internal/rag"
 	"github.com/niko/mqtt-agent-orchestration/pkg/types"
 )
 
 // RoleBasedProcessor implements role-specific task processing
 type RoleBasedProcessor struct {
-	role        types.WorkerRole
-	capabilities types.WorkerCapabilities
-	ragService  *rag.Service
+	role            types.WorkerRole
+	capabilities    types.WorkerCapabilities
+	ragService      *rag.Service
+	modelManager    *localmodels.Manager
+	contentAnalyzer *ContentAnalyzer
+	aiClient        *ai.AIClient
 }
 
 // NewRoleBasedProcessor creates a processor for a specific role
-func NewRoleBasedProcessor(role types.WorkerRole, ragService *rag.Service) *RoleBasedProcessor {
+func NewRoleBasedProcessor(role types.WorkerRole, ragService *rag.Service, modelManager *localmodels.Manager, contentAnalyzer *ContentAnalyzer) *RoleBasedProcessor {
 	capabilities := GetCapabilitiesForRole(role)
 	return &RoleBasedProcessor{
-		role:         role,
-		capabilities: capabilities,
-		ragService:   ragService,
+		role:            role,
+		capabilities:    capabilities,
+		ragService:      ragService,
+		modelManager:    modelManager,
+		contentAnalyzer: contentAnalyzer,
 	}
 }
 
@@ -73,11 +80,21 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 		}
 	}
 	
+	// Analyze content for optimal model selection
+	var modelAnalysis *AnalysisResult
+	if p.contentAnalyzer != nil {
+		analysis, err := p.contentAnalyzer.AnalyzeContent(ctx, workflowTask)
+		if err == nil {
+			modelAnalysis = analysis
+		}
+	}
+	
 	// Create enhanced task context for token optimization
 	taskContext := &EnhancedTaskContext{
-		SystemPrompt: systemPrompt,
-		RAGContext:   ragContext,
-		Task:         workflowTask,
+		SystemPrompt:   systemPrompt,
+		RAGContext:     ragContext,
+		Task:           workflowTask,
+		ModelAnalysis:  modelAnalysis,
 	}
 	
 	// Process based on role and task type
@@ -100,6 +117,7 @@ type EnhancedTaskContext struct {
 	SystemPrompt string
 	RAGContext   string
 	Task         *types.WorkflowTask
+	ModelAnalysis *AnalysisResult
 }
 
 // processDeveloperTask handles initial content creation
@@ -153,6 +171,15 @@ func (p *RoleBasedProcessor) processTesterTask(ctx context.Context, taskContext 
 // createDocument creates initial document content with optimized context
 func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
 	documentType := taskContext.Task.Payload["document_type"]
+	
+	// Try local model first if available
+	if p.modelManager != nil && taskContext.ModelAnalysis != nil {
+		result, err := p.processWithLocalModel(ctx, taskContext, taskContext.ModelAnalysis.RecommendedModel)
+		if err == nil {
+			return result, nil
+		}
+		// Fall back to external AI helper if local model fails
+	}
 	
 	// Build optimized prompt using system prompt and RAG context
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
@@ -244,6 +271,43 @@ func (p *RoleBasedProcessor) buildOptimizedPrompt(taskContext *EnhancedTaskConte
 	}
 	
 	return prompt.String()
+}
+
+// processWithLocalModel processes a task using a local model
+func (p *RoleBasedProcessor) processWithLocalModel(ctx context.Context, taskContext *EnhancedTaskContext, modelName string) (string, error) {
+	if p.modelManager == nil {
+		return "", fmt.Errorf("model manager not available")
+	}
+	
+	// Load the model if not already loaded
+	if err := p.modelManager.LoadModel(ctx, modelName); err != nil {
+		return "", fmt.Errorf("failed to load model %s: %w", modelName, err)
+	}
+	
+	// Get model instance
+	model, err := p.modelManager.GetModel(modelName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get model %s: %w", modelName, err)
+	}
+	
+	// Build optimized prompt
+	documentType := taskContext.Task.Payload["document_type"]
+	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
+	
+	// Create model input
+	input := localmodels.ModelInput{
+		Text:        optimizedPrompt,
+		Temperature: 0.7,
+		MaxTokens:   2048,
+	}
+	
+	// Process with local model
+	output, err := model.Predict(ctx, input)
+	if err != nil {
+		return "", fmt.Errorf("local model prediction failed: %w", err)
+	}
+	
+	return output.Text, nil
 }
 
 // Helper methods

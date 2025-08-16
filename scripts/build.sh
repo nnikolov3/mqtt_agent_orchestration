@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Design: Build script for MQTT Agent Orchestration System
-# Purpose: Build Go binaries and Docker images following coding standards
+# Purpose: Build Go binaries following coding standards
 # Usage: ./scripts/build.sh [--verbose] [--clean]
 
 set -euo pipefail
@@ -97,22 +97,29 @@ EOF
 
 # Clean build artifacts
 function clean_build() {
-    local rm_result=""
-    local rm_exit=""
-    
-    log_info "Cleaning build artifacts..."
-    
-    if [[ -d "$BUILD_DIR_GLOBAL" ]]; then
-        rm_result=$(rm -rf "$BUILD_DIR_GLOBAL")
-        rm_exit=$?
-        
-        if [[ $rm_exit -ne 0 ]]; then
-            log_error "Failed to clean build directory: $rm_result"
-            exit 1
-        fi
-    fi
-    
-    log_info "Build artifacts cleaned"
+	local rm_result=""
+	local rm_exit=""
+	
+	log_info "Cleaning build artifacts..."
+	
+	# Remove build directory
+	if [[ -d "$BUILD_DIR_GLOBAL" ]]; then
+		rm_result=$(rm -rf "$BUILD_DIR_GLOBAL" 2>&1)
+		rm_exit=$?
+		
+		if [[ $rm_exit -ne 0 ]]; then
+			log_error "Failed to clean build directory: $rm_result"
+			return 1
+		fi
+		log_info "Build directory cleaned"
+	fi
+	
+	# Clean Go cache if requested
+	if [[ "$CLEAN_GLOBAL" == true ]]; then
+		log_info "Cleaning Go cache..."
+		go clean -cache -modcache -testcache
+		log_info "Go cache cleaned"
+	fi
 }
 
 # Create build directory
@@ -176,6 +183,53 @@ function run_tests() {
     log_info "All tests passed"
 }
 
+# Validate model configuration
+function validate_model_config() {
+	local config_path="configs/models.yaml"
+	local validation_result=""
+	
+	log_info "Validating model configuration..."
+	
+	# Check if config file exists
+	if [[ ! -f "$config_path" ]]; then
+		log_warn "Model configuration file not found: $config_path"
+		log_warn "Local model features will be disabled"
+		return 0
+	fi
+	
+	# Validate YAML syntax
+	if command -v yq >/dev/null 2>&1; then
+		validation_result=$(yq eval '.' "$config_path" 2>&1)
+		if [[ $? -ne 0 ]]; then
+			log_error "Invalid YAML in model configuration: $validation_result"
+			return 1
+		fi
+		log_info "Model configuration YAML syntax is valid"
+	else
+		log_warn "yq not found, skipping YAML validation"
+	fi
+	
+	# Check model file existence
+	local missing_models=()
+	while IFS= read -r model_path; do
+		if [[ -n "$model_path" && ! -f "$model_path" ]]; then
+			missing_models+=("$model_path")
+		fi
+	done < <(yq eval '.models[].model_path' "$config_path" 2>/dev/null || echo "")
+	
+	if [[ ${#missing_models[@]} -gt 0 ]]; then
+		log_warn "Some model files are missing:"
+		for model in "${missing_models[@]}"; do
+			log_warn "  - $model"
+		done
+		log_warn "Local model features may be limited"
+	else
+		log_info "All model files found"
+	fi
+	
+	log_info "Model configuration validation completed"
+}
+
 # Run linting
 function run_linting() {
     local lint_result=""
@@ -215,9 +269,10 @@ function main() {
     
     create_build_dir
     
-    # Run tests and linting
+    # Run tests, linting, and validation
     run_tests
     run_linting
+    validate_model_config
     
     # Build Go binaries
     build_go_binary "worker" "./cmd/worker"

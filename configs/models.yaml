@@ -1,0 +1,112 @@
+# Model Configuration for MQTT Agent Orchestration System
+# Following "Never hard code values" principle - all model paths and settings centralized
+# Update paths to match your actual model locations
+
+models:
+  qwen-omni-3b:
+    name: "Qwen2.5-Omni-3B"
+    binary_path: "${LLAMA_CLI_PATH:-/home/niko/bin/llama-cli}"
+    model_path: "${LOCAL_MODELS_PATH:-/data/models}/Qwen2.5-Omni-3B-Q8_0.gguf"
+    type: "text"
+    gpu_layers: 37  # Full model fits in GPU
+    memory_limit: 5500  # Total GPU memory available
+    parameters:
+      temperature: "0.8"
+      max_tokens: "4096"
+      context_length: "16384"
+    specializations: ["general", "documentation", "code_generation", "text_analysis"]
+
+  qwen-vl-7b:
+    name: "Qwen2.5-VL-7B"
+    binary_path: "${LLAMA_MTMD_CLI_PATH:-/home/niko/bin/llama-mtmd-cli}"
+    model_path: "${LOCAL_MODELS_PATH:-/data/models}/Qwen2.5-VL-7B-Abliterated-Caption-it.Q8_0.gguf"
+    projector_path: "${LOCAL_MODELS_PATH:-/data/models}/Qwen2.5-VL-7B-Abliterated-Caption-it.mmproj-Q8_0.gguf"
+    type: "multimodal"
+    gpu_layers: 15  # Partial offload to GPU
+    memory_limit: 5500  # Total GPU memory available
+    parameters:
+      temperature: "0.7"
+      max_tokens: "2048"
+      context_length: "8192"
+    specializations: ["ui_analysis", "code_with_images", "error_screenshots", "multimodal_tasks"]
+
+  llava-llama-3-8b:
+    name: "LLaVA-Llama-3-8B"
+    binary_path: "${LLAMA_MTMD_CLI_PATH:-/home/niko/bin/llama-mtmd-cli}"
+    model_path: "${LOCAL_MODELS_PATH:-/data/models}/llava-llama-3-8b-v1_1-int4.gguf"
+    projector_path: "${LOCAL_MODELS_PATH:-/data/models}/llava-llama-3-8b-v1_1-mmproj-f16.gguf"
+    type: "multimodal"
+    gpu_layers: 12  # Partial offload to GPU
+    memory_limit: 5500  # Total GPU memory available
+    parameters:
+      temperature: "0.7"
+      max_tokens: "2048"
+      context_length: "8192"
+    specializations: ["ui_analysis", "code_with_images", "error_screenshots", "multimodal_tasks"]
+
+  mimo-vl-7b:
+    name: "MiMo-VL-7B"
+    binary_path: "${LLAMA_MTMD_CLI_PATH:-/home/niko/bin/llama-mtmd-cli}"
+    model_path: "${LOCAL_MODELS_PATH:-/data/models}/MiMo-VL-7B-RL-Q8_0.gguf"
+    projector_path: "${LOCAL_MODELS_PATH:-/data/models}/MiMo-mmproj-BF16.gguf"
+    type: "multimodal"
+    gpu_layers: 15  # Partial offload to GPU
+    memory_limit: 5500  # Total GPU memory available
+    parameters:
+      temperature: "0.7"
+      max_tokens: "2048"
+      context_length: "8192"
+    specializations: ["ui_analysis", "code_with_images", "error_screenshots", "multimodal_tasks"]
+
+  qwen-embedding-4b:
+    name: "Qwen3-Embedding-4B"
+    binary_path: "${LLAMA_SERVER_PATH:-/home/niko/bin/llama-server}"
+    model_path: "${LOCAL_MODELS_PATH:-/data/models}/Qwen3-Embedding-4B-Q8_0.gguf"
+    type: "embedding"
+    gpu_layers: 20  # Partial offload to GPU
+    memory_limit: 5500  # Total GPU memory available
+    parameters:
+      temperature: "0.1"
+      max_tokens: "512"
+      context_length: "8192"
+    specializations: ["embeddings", "vector_generation", "similarity_search"]
+
+# Manager Configuration
+manager:
+  max_gpu_memory: 5632  # 5.5GB for RTX 3060 (leaving 256MB buffer)
+  nvidia_smi_path: "/usr/bin/nvidia-smi"
+  monitor_interval: "30s"
+  
+# Fallback Configuration - Heavy Lifting with API Models
+fallback:
+  enable_external_ai: true
+  # Priority order for complex tasks (heavy lifting)
+  preferred_apis: ["cerebras", "nvidia", "gemini", "grok", "groq"]
+  # Use local models for small tasks, API models for complex reasoning
+  task_complexity_threshold: "medium"  # small=local, medium+=API
+  max_retries: 3
+  retry_delay: "5s"
+  
+  # API configurations (from claude_helpers.toml)
+  cerebras:
+    models: ["gpt-oss-120b", "qwen-3-coder-480b", "qwen-3-32b", "llama-3.3-70b"]
+    description: "Fast code analysis, review, and generation"
+  nvidia:
+    models: ["nvidia/llama-3.3-nemotron-super-49b-v1.5", "openai/gpt-oss-120b"]
+    description: "Multimodal analysis including OCR"
+  gemini:
+    models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]
+    description: "Comprehensive multimodal analysis"
+  grok:
+    models: ["grok-4-0709", "grok-3", "grok-3-mini"]
+    description: "Creative solutions and multimodal analysis"
+  groq:
+    models: ["moonshotai/kimi-k2-instruct", "llama-3.3-70b-versatile"]
+    description: "Ultra-fast inference for speed-critical tasks"
+
+# Performance Settings
+performance:
+  enable_batching: true
+  max_batch_size: 4
+  enable_context_reuse: true
+  max_context_age: "300s"
