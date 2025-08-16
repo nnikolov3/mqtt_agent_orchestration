@@ -6,11 +6,12 @@ The `cmd/` directory contains all executable applications that form the MQTT Age
 
 ## Architecture Philosophy
 
-Following our **Excellence through Rigor** philosophy, each executable is:
-- **Self-contained**: Minimal dependencies, clear entry points
-- **Observable**: Comprehensive logging and metrics
-- **Resilient**: Graceful degradation and error recovery
-- **Testable**: Designed for integration testing
+Following our **"Excellence through Rigor"** philosophy, each executable is:
+- **Self-contained**: Minimal dependencies, clear entry points following **"Do More with Less"**
+- **Observable**: Comprehensive logging and metrics with **"Fail Fast, Fail Loud"** diagnostics
+- **Resilient**: Graceful degradation and error recovery mechanisms
+- **Configurable**: **"Never Hard Code Values"** - all settings externalized
+- **Testable**: Designed for comprehensive integration testing
 
 ## Applications
 
@@ -32,7 +33,7 @@ Following our **Excellence through Rigor** philosophy, each executable is:
 
 **Usage**:
 ```bash
-./bin/orchestrator --mqtt-host localhost --mqtt-port 1883 --verbose
+./bin/server --mqtt-host localhost --mqtt-port 1883 --port 8080 --verbose
 ```
 
 ### 2. `role-worker/` - Specialized AI Agent Workers
@@ -225,4 +226,4 @@ nvidia-smi
 
 ---
 
-**Production Ready**: All applications are designed for production deployment with comprehensive error handling, monitoring, and scalability features. Each executable can operate independently while contributing to the overall system functionality.
+All applications feature comprehensive error handling, monitoring, and scalability features. Each executable can operate independently while contributing to the overall system functionality.

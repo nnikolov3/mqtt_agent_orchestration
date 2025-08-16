@@ -123,7 +123,7 @@ type MemoryUsage struct {
 package main
 
 import (
-    "github.com/niko/mqtt-agent-orchestration/pkg/types"
+    "github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 func main() {
@@ -191,7 +191,7 @@ func (rm *RAGManager) StoreUserKnowledge(ctx context.Context, userID string, kno
 package main
 
 import (
-    "github.com/niko/mqtt-agent-orchestration/pkg/userservice"
+    "github.com/nnikolov3/mqtt-agent-orchestration/pkg/userservice"
 )
 
 func main() {
@@ -334,7 +334,7 @@ Packages follow semantic versioning (SemVer):
 
 ```go
 // go.mod example
-module github.com/niko/mqtt-agent-orchestration
+module github.com/nnikolov3/mqtt-agent-orchestration
 
 go 1.24
 
@@ -464,8 +464,8 @@ func (t *WorkflowTask) MarshalJSON() ([]byte, error) {
 package main
 
 import (
-    "github.com/niko/mqtt-agent-orchestration/pkg/types"
-    "github.com/niko/mqtt-agent-orchestration/pkg/userservice"
+    "github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
+    "github.com/nnikolov3/mqtt-agent-orchestration/pkg/userservice"
 )
 
 func main() {
@@ -523,7 +523,7 @@ func handleTask(w http.ResponseWriter, r *http.Request) {
 
 ```go
 // Enable debug logging
-import "github.com/niko/mqtt-agent-orchestration/pkg/types"
+import "github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 
 // Set debug mode
 types.SetDebugMode(true)
@@ -552,4 +552,4 @@ if err := task.ValidateWithDetails(); err != nil {
 
 ---
 
-**Production Ready**: Public packages are designed for production use with comprehensive testing, documentation, and backward compatibility guarantees. They provide a stable foundation for building applications that integrate with the MQTT Agent Orchestration System.
+Public packages feature comprehensive testing, documentation, and backward compatibility guarantees. They provide a stable foundation for building applications that integrate with the MQTT Agent Orchestration System.

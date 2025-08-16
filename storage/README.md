@@ -414,7 +414,7 @@ payload_indexing: true       # Enable payload filtering
     },
     "timestamp": "2024-01-15T10:30:00Z",
     "metadata": {
-      "hardware": "RTX 3060",
+      "hardware": "GPU",
       "optimization_level": "Q8_0"
     }
   }
@@ -790,4 +790,4 @@ encryption:
 
 ---
 
-**Production Ready**: The storage system is designed for production use with comprehensive backup, monitoring, and security features. It provides a robust foundation for managing the system's knowledge base and data persistence.
+The storage system features comprehensive backup, monitoring, and security features. It provides a robust foundation for managing the system's knowledge base and data persistence.

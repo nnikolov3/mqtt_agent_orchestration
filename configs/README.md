@@ -19,10 +19,10 @@ Following our **"Excellence through Rigor"** philosophy, configuration managemen
 **Purpose**: Configuration for local GGUF model management and optimization.
 
 **Design Principles**:
-- **Resource Management**: GPU memory optimization for RTX 3060
+- **Resource Management**: GPU memory optimization following **"Do More with Less"**
 - **Model Selection**: Intelligent model routing based on task requirements
 - **Performance Tuning**: Optimized parameters for each model
-- **Fallback Strategy**: Graceful degradation when models unavailable
+- **Fallback Strategy**: Graceful degradation when models unavailable (**"Fail Fast, Fail Loud"**)
 
 **Configuration Structure**:
 ```yaml
@@ -35,7 +35,7 @@ models:
     binary_path: "/usr/local/bin/llama-server"
     model_path: "/data/models/Qwen2.5-Omni-3B-Q8_0.gguf"
     type: "text"
-    memory_limit: 3072  # 3GB for RTX 3060
+    memory_limit: 3072  # Adjust based on GPU memory
     parameters:
       temperature: "0.8"
       max_tokens: "4096"
@@ -69,7 +69,7 @@ models:
 
 # Manager Configuration
 manager:
-  max_gpu_memory: 5632  # RTX 3060 5.5GB + 256MB buffer
+  max_gpu_memory: 6144  # Adjust based on your GPU memory
   nvidia_smi_path: "/usr/bin/nvidia-smi"
   monitor_interval: "30s"
   lru_cache_size: 3  # Maximum concurrent models
@@ -135,7 +135,7 @@ local_models_mcp:
   timeout: "60s"
   env:
     MODELS_PATH: "/data/models"
-    GPU_MEMORY_LIMIT: "5632"
+    GPU_MEMORY_LIMIT: "6144"
     LOG_LEVEL: "info"
 
 # File System MCP Server Configuration
@@ -595,4 +595,4 @@ cp configs/models.yaml.backup configs/models.yaml
 
 ---
 
-**Production Ready**: Configuration management is designed for production use with comprehensive validation, security features, and monitoring capabilities. It provides a robust foundation for managing system configuration across different environments.
+Configuration management features comprehensive validation, security features, and monitoring capabilities. It provides a robust foundation for managing system configuration across different environments.
