@@ -1,0 +1,476 @@
+/* MQTT Agent Orchestration - Animations */
+/* ===================================== */
+
+/* Pulse Animation for Active Status */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Breathing Animation for Processing */
+@keyframes breathe {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 1;
+    }
+}
+
+/* Rotate Animation for Loading */
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Wave Animation for Data Flow */
+@keyframes wave {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Bounce Animation */
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+/* Shake Animation for Errors */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(5px);
+    }
+}
+
+/* Glow Animation */
+@keyframes glow {
+    0% {
+        box-shadow: 0 0 5px rgba(79, 70, 229, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(79, 70, 229, 0.4), 0 0 30px rgba(79, 70, 229, 0.2);
+    }
+    100% {
+        box-shadow: 0 0 5px rgba(79, 70, 229, 0.2);
+    }
+}
+
+/* Slide Up Animation */
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Slide Down Animation */
+@keyframes slideDown {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Zoom In Animation */
+@keyframes zoomIn {
+    from {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Zoom Out Animation */
+@keyframes zoomOut {
+    from {
+        transform: scale(1);
+        opacity: 1;
+    }
+    to {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+}
+
+/* Flip Animation */
+@keyframes flip {
+    from {
+        transform: rotateY(0);
+    }
+    to {
+        transform: rotateY(360deg);
+    }
+}
+
+/* Progress Bar Animation */
+@keyframes progress {
+    0% {
+        width: 0;
+    }
+    100% {
+        width: 100%;
+    }
+}
+
+/* Ripple Effect */
+@keyframes ripple {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* Typing Animation */
+@keyframes typing {
+    from {
+        width: 0;
+    }
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+/* Gradient Animation */
+@keyframes gradientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Float Animation */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* Spin Animation */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Connection Animation */
+@keyframes connect {
+    0% {
+        stroke-dashoffset: 1000;
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Data Flow Animation */
+@keyframes dataFlow {
+    0% {
+        transform: translateX(-100%) translateY(-50%);
+        opacity: 0;
+    }
+    20% {
+        opacity: 1;
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(100%) translateY(-50%);
+        opacity: 0;
+    }
+}
+
+/* Utility Animation Classes */
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-bounce {
+    animation: bounce 1s infinite;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+.animate-ping {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping {
+    75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+}
+
+.animate-zoom-in {
+    animation: zoomIn 0.3s ease-out;
+}
+
+/* Loading Spinner */
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(79, 70, 229, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s ease-in-out infinite;
+}
+
+.spinner.small {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+}
+
+.spinner.large {
+    width: 32px;
+    height: 32px;
+    border-width: 4px;
+}
+
+/* Progress Indicator */
+.progress-ring {
+    transform: rotate(-90deg);
+}
+
+.progress-ring__circle {
+    stroke-dasharray: 126;
+    stroke-dashoffset: 126;
+    transition: stroke-dashoffset 0.35s;
+    transform-origin: center;
+}
+
+/* Skeleton Loading */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-tertiary) 25%,
+        var(--border-color) 50%,
+        var(--bg-tertiary) 75%
+    );
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+/* Hover Effects */
+.hover-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.hover-grow {
+    transition: transform 0.2s ease-in-out;
+}
+
+.hover-grow:hover {
+    transform: scale(1.05);
+}
+
+.hover-glow {
+    transition: box-shadow 0.3s ease-in-out;
+}
+
+.hover-glow:hover {
+    box-shadow: 0 0 20px rgba(79, 70, 229, 0.3);
+}
+
+/* Click Effects */
+.click-shrink {
+    transition: transform 0.1s ease-in-out;
+}
+
+.click-shrink:active {
+    transform: scale(0.95);
+}
+
+/* Ripple Effect Container */
+.ripple-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: scale(0);
+    animation: ripple 0.6s ease-out;
+    pointer-events: none;
+}
+
+/* Status Indicators */
+.status-dot {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-dot.active {
+    background: var(--success-color);
+}
+
+.status-dot.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--success-color);
+    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Workflow Animation */
+.workflow-node {
+    position: relative;
+}
+
+.workflow-node::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -20px;
+    width: 20px;
+    height: 2px;
+    background: var(--border-color);
+    transform: translateY(-50%);
+}
+
+.workflow-node.active::before {
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--primary-color) 50%, transparent 50%);
+    background-size: 200% 100%;
+    animation: dataFlow 2s linear infinite;
+}
+
+/* Chart Animations */
+.chart-bar {
+    transform-origin: bottom;
+    animation: growUp 0.6s ease-out;
+}
+
+@keyframes growUp {
+    from {
+        transform: scaleY(0);
+    }
+    to {
+        transform: scaleY(1);
+    }
+}
+
+.chart-line {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: drawLine 1.5s ease-out forwards;
+}
+
+@keyframes drawLine {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Notification Badge */
+.badge-ping {
+    position: relative;
+}
+
+.badge-ping::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background: inherit;
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Theme Transition */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
