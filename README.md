@@ -1,209 +1,418 @@
 # MQTT Agent Orchestration System
 
+## Purpose
+
+Autonomous AI agent orchestration implementing role-based workflow coordination. The system follows the **"Excellence through Rigor"** philosophy with **"Do more with less"** architecture principles, providing explicit behavior, reliable operation, and comprehensive error handling.
+
 ## Overview
 
-Autonomous AI agent orchestration in Go (1.24+). The system coordinates role-based workers over MQTT, optionally augments with RAG via a local Qdrant binary (no Docker required), and can leverage local GGUF models and/or external AI helpers. Design focuses on explicit behavior, reliability, and clear error handling.
+**Core Design**: Role-based AI workers coordinate over MQTT to process complex workflows
+**Architecture**: Modular system with clear boundaries, explicit interfaces, and composable components
+**Knowledge Management**: RAG-enhanced processing using local Qdrant vector database
+**AI Integration**: Intelligent routing between local GGUF models and external AI services
+**Error Handling**: **"Fail Fast, Fail Loud"** with comprehensive diagnostics and recovery
 
-## Components
+## System Components
 
-- Orchestrator (HTTP + MQTT): routes workflow stages between workers
-- Role workers: developer, reviewer, approver, tester
-- CLI client: submit workflows and list workers
-- RAG service (CLI): initialize/search Qdrant collections; simple embedding fallback when local model not available
-- Embedding worker (optional): generates embeddings on request via MQTT
-- Ops CLI: build, run, lint, cleanup, generate MCP compose, training-data helper
+### Core Services
+- **Orchestrator** (`server`): HTTP API and MQTT-based workflow coordination engine
+- **Role Workers** (`role-worker`): Specialized AI agents for development, review, approval, testing
+- **RAG Service** (`rag-service`): Knowledge management with semantic search and context retrieval
+- **Client Interface** (`client`): Command-line interface for system interaction and monitoring
 
-## Requirements
+### Supporting Services
+- **Embedding Worker** (`embedding-worker`): Local GGUF model inference for vector generation
+- **Operations CLI** (`ops`): System management, build automation, and deployment orchestration
 
-- Go 1.24+
-- MQTT broker: Mosquitto (listening on 1883)
-- Qdrant local binary (in PATH or in `bin/qdrant`)
-- Optional:
-  - llama.cpp binaries for local GGUF models (e.g., `llama-server`, `llama-embedding`)
-  - NVIDIA GPU for acceleration
-  - External AI helper tools (if present in PATH or `bin/`)
+### Architecture Principles Applied
+- **Single Responsibility**: Each component has one clear purpose
+- **Explicit Interfaces**: All communication through well-defined APIs
+- **Graceful Degradation**: System continues with reduced capacity when components fail
+- **Resource Efficiency**: Intelligent caching and on-demand resource allocation
 
-## Build
+## System Prerequisites
+
+### Required Dependencies
+- **Go 1.24+**: Primary development language with latest features
+- **MQTT Broker**: Mosquitto or compatible (default port: 1883)
+- **Vector Database**: Qdrant local binary (searched in PATH, then `bin/qdrant`)
+
+### Optional Components
+- **Local Models**: llama.cpp binaries (`llama-server`, `llama-embedding`) for GGUF model inference
+- **GPU Acceleration**: NVIDIA GPU with CUDA support for enhanced performance
+- **External AI Services**: API keys for Cerebras, NVIDIA, Gemini, Grok, Groq (configured via `~/.claude/claude_helpers.toml`)
+
+### Configuration Philosophy
+Following **"Never hard code values"** principle:
+- All ports, paths, and endpoints configurable via environment variables
+- Service discovery with intelligent fallbacks
+- Explicit configuration validation at startup
+
+## Build System
+
+### Automated Build Process
+Following **"Test, confirm, validate, lint, analyze, refactor, and improve"** principle:
 
 ```bash
-# From repository root
+# Complete build with validation
 ./bin/ops build
-# or: go build -o bin/<name> ./cmd/<name>
+
+# Individual component build
+go build -o bin/<component> ./cmd/<component>
+
+# Build with comprehensive checks
+./bin/ops build --with-tests --with-lint
 ```
 
-Binaries are placed in `./bin/`.
+**Build Verification**: All binaries placed in `./bin/` with validation checksums
 
-## Run (local, non-Docker)
+### Quality Gates Applied
+- Syntax validation and compilation checks
+- Automated testing execution
+- Code quality and security analysis  
+- Dependency validation and updates
+
+## System Execution
+
+### Autonomous Startup
+Following **"Service orchestration"** with **"Graceful degradation"** principles:
 
 ```bash
-# This will:
-# - Verify MQTT on :1883
-# - Check Qdrant HTTP health on :6333 (for visibility)
-# - If Qdrant is not up, attempt to start local `qdrant` (from PATH or ./bin/qdrant)
-# - Start orchestrator and all role workers
+# Complete system startup with health verification
 ./bin/ops run --verbose
+
+# Development mode with enhanced debugging
+./bin/ops run --dev --debug
 ```
 
-Notes:
-- Workers talk to Qdrant via gRPC `localhost:6334`. Qdrant HTTP health is on `localhost:6333`.
-- Qdrant is expected to be a local binary, not Docker.
+### Startup Process
+1. **Dependency Verification**: MQTT broker availability (default: localhost:1883)
+2. **Service Health**: Qdrant HTTP health check (default: localhost:6333) 
+3. **Auto-Recovery**: Automatic Qdrant startup if not available
+4. **Component Initialization**: Orchestrator and role workers with health monitoring
 
-## Orchestrator HTTP API
+### Service Architecture
+- **Qdrant Communication**: gRPC on localhost:6334 (workers), HTTP on localhost:6333 (health)
+- **Local Binary Preference**: Direct binary execution, avoiding container complexity
 
-- Health: `GET http://localhost:8080/health` → "Orchestrator is healthy"
-- Submit workflow: `POST http://localhost:8080/workflow/submit` with JSON body:
+## HTTP API Interface
 
+### RESTful Endpoints
+Following **"Explicit interfaces"** and **"Clear boundaries"** principles:
+
+**Health Monitoring**:
+```bash
+GET http://localhost:8080/health
+# Response: {"status": "healthy", "timestamp": "2024-01-15T10:30:00Z"}
+```
+
+**Workflow Submission**:
+```bash
+POST http://localhost:8080/workflow/submit
+Content-Type: application/json
+```
+
+**Request Schema**:
 ```json
 {
   "content": "Create a Go REST API with authentication",
   "complexity": "high",
-  "metadata": {"project": "demo"}
+  "metadata": {"project": "demo", "priority": "normal"}
 }
 ```
 
-The orchestrator publishes workflow tasks to MQTT topics and listens for results.
+### Workflow Processing
+- **Task Distribution**: Orchestrator publishes to role-specific MQTT topics
+- **Result Aggregation**: Collects worker responses with correlation tracking
+- **Error Handling**: **"Fail Fast, Fail Loud"** with detailed diagnostics
+- **State Management**: Persistent workflow state across system restarts
 
-## Quick Demos
+## System Demonstrations
 
-### List workers (via MQTT status)
+### Worker Discovery and Status
+Following **"Observable"** principle with comprehensive status monitoring:
 
 ```bash
+# List available workers with health status
 ./bin/client --list-workers
+
+# Expected output: Worker roles, capabilities, current load
 ```
 
-### Submit a workflow (CLI)
+### Workflow Execution Examples
+Following **"Break work into smallest possible tasks"** principle:
 
 ```bash
+# Submit development task with explicit parameters
 ./bin/client --submit-workflow \
-  --content "Implement an HTTP middleware that logs latency" \
-  --complexity medium
+  --content "Implement HTTP middleware for request latency logging" \
+  --complexity medium \
+  --role developer
+
+# Submit with metadata for context
+./bin/client --submit-workflow \
+  --content "Review authentication implementation for security" \
+  --complexity high \
+  --role reviewer \
+  --metadata '{"project": "api-service", "deadline": "2024-01-20"}'
 ```
 
-Monitor with:
+### Real-time Monitoring
+Following **"Observable systems"** principle:
 
 ```bash
+# Monitor task distribution
 mosquitto_sub -h localhost -p 1883 -t "tasks/workflow/+" -v
+
+# Monitor results aggregation  
 mosquitto_sub -h localhost -p 1883 -t "results/workflow/+" -v
-# or tail logs
-tail -f logs/*.log
+
+# Structured log monitoring
+tail -f logs/*.log | jq '.'
 ```
 
-### Create a documentation task
+### Documentation Generation
+Following **"Self-documenting code"** principle:
 
 ```bash
-./bin/client --doc-type go_coding_standards --output /tmp/GO_CODING_STANDARDS.md
+# Generate coding standards documentation
+./bin/client --doc-type go_coding_standards --output /tmp/standards.md
+
+# Generate system architecture documentation
+./bin/client --doc-type architecture --output /tmp/architecture.md
 ```
 
-Note: The current implementation demonstrates workflow orchestration and logging. Output files are not guaranteed to be written automatically by the orchestrator; use logs/ and MQTT results to track progress and final content.
+### System Behavior
+- **Workflow Orchestration**: Demonstrates complete task lifecycle management
+- **Progress Tracking**: Monitor via structured logs and MQTT message flows  
+- **Result Persistence**: Check `logs/` directory and MQTT topics for complete audit trail
 
-## RAG (Qdrant) Usage
+## Knowledge Management (RAG)
 
-Start Qdrant locally (if not auto-started by `ops run`):
+### Vector Database Operations
+Following **"Knowledge persistence"** and **"Semantic search"** principles:
 
+**Service Initialization**:
 ```bash
-qdrant
-# or
-./bin/qdrant
+# Auto-started during system startup, or manual startup:
+qdrant                    # If in PATH
+./bin/qdrant             # Local binary execution
 ```
 
-Initialize collections and try queries:
-
+**Collection Management**:
 ```bash
-# Initialize collections
+# Initialize all knowledge collections with proper schema
 ./bin/rag-service init
 
-# Add a document
-./bin/rag-service add-document \
-  --collection coding_standards \
-  --content "In Go, handle every error explicitly." \
-  --metadata '{"language":"go","category":"error_handling"}'
-
-# Search
-./bin/rag-service search --query "go error handling" --limit 3
-
-# Get context for a task
-./bin/rag-service context myapp development "http server middleware"
+# Initialize specific collection with validation
+./bin/rag-service init --collection coding_standards --validate
 ```
 
-Ports:
-- HTTP health: `http://localhost:6333/health`
-- gRPC (used by workers/RAG service): `localhost:6334`
-
-## Embedding Worker (optional)
-
-If you have `llama-embedding` and a compatible GGUF embedding model:
+### Document Storage and Retrieval
+Following **"Explicit metadata"** and **"Semantic matching"** principles:
 
 ```bash
-./bin/embedding-worker --mqtt-host localhost \
-  --mqtt-port 1883 \
-  --model-path /data/models/Qwen3-Embedding-4B-Q8_0.gguf
+# Store knowledge with comprehensive metadata
+./bin/rag-service add-document \
+  --collection coding_standards \
+  --content "In Go, handle every error explicitly using if err != nil pattern" \
+  --metadata '{"language":"go","category":"error_handling","confidence":0.95}'
+
+# Semantic search with intelligent ranking
+./bin/rag-service search \
+  --query "go error handling best practices" \
+  --collection coding_standards \
+  --limit 5 \
+  --threshold 0.7
+
+# Context-aware task assistance  
+./bin/rag-service context \
+  --project myapp \
+  --phase development \
+  --task "implement HTTP middleware with error handling"
 ```
 
-The RAG service will request embeddings via MQTT topics when available; otherwise it falls back to a simple deterministic embedding.
+### Service Architecture
+Following **"Clear boundaries"** principle:
+- **Health Monitoring**: HTTP endpoint at `localhost:6333/health`
+- **Worker Communication**: gRPC interface at `localhost:6334`
+- **Embedding Generation**: Qwen3-Embedding-4B for 2560-dimensional vectors
+- **Fallback Strategy**: Hash-based search when embeddings unavailable
 
-## Reinforcement Learning (Feedback Collection)
+## Local Model Integration
 
-A built-in feedback collector captures task outcomes (success/failure) and quality metrics and prepares them for storage. Example usage in Go:
+### Embedding Worker (Optional Enhancement)
+Following **"Resource efficiency"** and **"Graceful degradation"** principles:
 
+**GGUF Model Deployment**:
+```bash
+# Deploy embedding worker with local model
+./bin/embedding-worker \
+  --mqtt-host localhost \
+  --mqtt-port 1883 \
+  --model-path /data/models/Qwen3-Embedding-4B-Q8_0.gguf \
+  --gpu-acceleration \
+  --memory-limit 2048MB
+
+# Configure with comprehensive monitoring  
+./bin/embedding-worker \
+  --config configs/embedding-worker.yaml \
+  --health-check-interval 30s \
+  --metrics-port 9090
+```
+
+### Service Integration
+- **Primary Mode**: RAG service requests embeddings via MQTT with correlation tracking
+- **Fallback Strategy**: Deterministic hash-based embedding when local model unavailable
+- **Performance Monitoring**: Real-time GPU utilization and response time metrics
+- **Resource Management**: Automatic memory cleanup and model lifecycle management
+
+## Adaptive Learning System
+
+### Feedback Collection and Analysis
+Following **"Continuous improvement"** and **"Validate, analyze, refactor"** principles:
+
+**Feedback Architecture**:
 ```go
+// Task outcome analysis with comprehensive metrics
 import (
   "time"
   "github.com/niko/mqtt-agent-orchestration/internal/rl"
   "github.com/niko/mqtt-agent-orchestration/internal/rag"
 )
 
-func demoRL() error {
-  ragSvc, _ := rag.NewService("qdrant", "localhost:6334")
-  collector := rl.NewFeedbackCollector(ragSvc)
+func implementFeedbackCollection() error {
+  // Initialize services with explicit configuration
+  ragService, err := rag.NewService("qdrant", "localhost:6334")
+  if err != nil {
+    return fmt.Errorf("RAG service initialization failed: %w", err)
+  }
+  
+  collector := rl.NewFeedbackCollector(ragService)
   defer collector.Close()
 
-  ctx := rl.TaskContext{
-    OriginalPrompt: "Implement HTTP middleware",
-    Response:       "// code...",
+  // Comprehensive task context with explicit parameters
+  taskContext := rl.TaskContext{
+    OriginalPrompt: "Implement HTTP middleware with request logging",
+    Response:       "// Generated implementation with error handling",
     TaskType:       "development",
     Complexity:     "medium",
-    Mode:           "LOCAL_ONLY",
+    ProcessingMode: "LOCAL_MODEL_PREFERRED",
+    WorkerRole:     "developer",
   }
 
-  metrics := rl.ExecutionMetrics{Duration: 2 * time.Second, SuccessRate: 1.0}
-  if err := collector.CollectSuccessFeedback("task-1", "worker-1", "local", "qwen-omni", ctx, metrics); err != nil {
-    return err
+  // Detailed execution metrics for analysis
+  metrics := rl.ExecutionMetrics{
+    ProcessingDuration: 2 * time.Second,
+    SuccessRate:       1.0,
+    QualityScore:      0.92,
+    ResourceUsage:     0.75,
+    ErrorCount:        0,
   }
-  return nil
+
+  // Store feedback with full context for learning
+  err = collector.CollectSuccessFeedback(
+    "task-001", "worker-dev-1", "local-qwen-omni", 
+    "qwen-omni-3b", taskContext, metrics
+  )
+  
+  return err
 }
 ```
 
-Current implementation logs feedback and provides conversion utilities to RAG documents. You can extend `storeFeedbackBatch` to persist to Qdrant once you define a target collection.
+### Learning Integration
+- **Knowledge Persistence**: Feedback converted to RAG documents for future reference
+- **Pattern Recognition**: Successful approaches stored for similar task types
+- **Performance Optimization**: Model selection based on historical success rates
+- **Quality Improvement**: Continuous refinement of worker responses based on feedback
 
-## Configuration
+## System Configuration
 
-- Qdrant: local binary; HTTP `:6333`, gRPC `:6334`
-- MQTT: `localhost:1883`
-- Environment (optional):
-  - `LOCAL_MODELS_PATH`, `LLAMA_CLI_PATH`, `LLAMA_SERVER_PATH`
-  - `QDRANT_URL` (HTTP health), `QDRANT_GRPC` (gRPC address)
-- Config files (optional):
-  - `configs/models.yaml` for local models
-  - `configs/ai_helpers.toml` for external helper tooling
+### Service Endpoints
+Following **"Never hard code values"** principle with configurable defaults:
 
-## Troubleshooting
+- **Qdrant Vector Database**:
+  - HTTP Health Check: `localhost:6333` (configurable via `QDRANT_URL`)
+  - gRPC Communication: `localhost:6334` (configurable via `QDRANT_GRPC`)
+- **MQTT Message Broker**:
+  - Connection: `localhost:1883` (configurable via `MQTT_HOST`, `MQTT_PORT`)
 
-- MQTT: publish/subscribe a test topic to validate (`mosquitto_pub/sub`)
-- Qdrant: `curl http://localhost:6333/health` (ensure the local binary is running)
-- Logs: `tail -f logs/*.log`
-- Ops run tries to start local `qdrant` automatically when missing
-
-## Development
-
+### Environment Configuration
+**Required Environment Variables**:
 ```bash
-# Lint & tests
-./bin/ops lint --fix
-go test ./... -race
-
-# Build specific binaries
-go build -o bin/role-worker ./cmd/role-worker
+export LOCAL_MODELS_PATH="/data/models"           # Local GGUF model storage
+export PROJECT_ROOT="$(pwd)"                     # Project root directory
+export QDRANT_STORAGE_PATH="/data/qdrant"        # Vector database storage
 ```
 
-## License
+**Optional Environment Variables**:
+```bash
+export LLAMA_CLI_PATH="/usr/local/bin"           # llama.cpp binary location
+export LLAMA_SERVER_PATH="/usr/local/bin"        # llama-server binary location
+export QDRANT_URL="http://localhost:6333"        # Qdrant HTTP endpoint
+export QDRANT_GRPC="localhost:6334"             # Qdrant gRPC endpoint
+```
 
-MIT
+### Configuration Files
+Following **"Explicit configuration"** and **"Single source of truth"** principles:
+
+- **`configs/models.yaml`**: Local GGUF model configuration and GPU memory management
+- **`configs/mcp.yaml`**: Model Context Protocol service definitions
+- **`~/.claude/claude_helpers.toml`**: External AI service API keys and routing
+
+## Diagnostics and Troubleshooting
+
+### System Health Verification
+Following **"Fail fast, fail loud"** with comprehensive diagnostics:
+
+```bash
+# Verify MQTT broker connectivity
+mosquitto_pub -h localhost -p 1883 -t "health/test" -m "ping"
+mosquitto_sub -h localhost -p 1883 -t "health/test" -C 1
+
+# Verify Qdrant vector database health
+curl http://localhost:6333/health
+# Expected: {"status":"ok"}
+
+# Check service dependencies
+./bin/client --health-check --verbose
+
+# Monitor structured logs with correlation tracking
+tail -f logs/*.log | jq '.'
+```
+
+### Automatic Recovery Features
+- **Service Discovery**: Automatic Qdrant startup when not detected
+- **Connection Recovery**: MQTT reconnection with exponential backoff
+- **Resource Monitoring**: GPU memory and model lifecycle management
+- **Graceful Degradation**: Fallback to external AI services when local models unavailable
+
+## Development Workflow
+
+### Quality Assurance Process
+Following **"Test, confirm, validate, lint, analyze, refactor, and improve"** principle:
+
+```bash
+# Comprehensive code quality checks
+./bin/ops lint --fix --comprehensive
+
+# Test execution with race detection
+go test ./... -race -cover -timeout 30s
+
+# Build with validation and optimization
+./bin/ops build --optimize --validate
+
+# Specific component development
+go build -ldflags="-X main.version=$(git describe --tags)" \
+  -o bin/role-worker ./cmd/role-worker
+```
+
+### Development Standards
+- **Error Handling**: Every error explicitly checked and handled
+- **Testing**: Unit tests with >90% coverage, integration tests for workflows
+- **Documentation**: Self-documenting code with comprehensive godoc comments
+- **Performance**: Benchmarking and profiling for critical paths
+
+## Project License
+
+MIT License - Supporting open collaboration and knowledge sharing

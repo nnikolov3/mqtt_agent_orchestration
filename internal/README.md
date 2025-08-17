@@ -42,7 +42,7 @@ Following our **"Do more with less"** principle, the internal system is:
 
 **Design Principles**:
 - **Single Source of Truth**: All configuration centralized
-- **Environment Agnostic**: Works across development, staging, production
+- **Environment Agnostic**: Works across development, staging, deployment environments
 - **Validation**: Configuration validation at startup
 
 **Key Features**:

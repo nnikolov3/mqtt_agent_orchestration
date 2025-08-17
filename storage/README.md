@@ -268,7 +268,7 @@ payload_indexing: true       # Enable payload filtering
     "metadata": {
       "author": "system",
       "tested": true,
-      "performance_notes": "Optimized for production use"
+      "performance_notes": "Optimized for stable operation and efficiency"
     }
   }
 }

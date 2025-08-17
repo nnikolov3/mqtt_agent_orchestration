@@ -84,7 +84,7 @@ export GO_VERSION="1.24"
 ./scripts/run.sh --components orchestrator,worker
 
 # Start with custom configuration
-./scripts/run.sh --config production.yaml
+./scripts/run.sh --config deployment.yaml
 
 # Start in development mode
 ./scripts/run.sh --dev

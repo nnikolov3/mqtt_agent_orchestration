@@ -7,10 +7,10 @@ The `configs/` directory contains all configuration files for the MQTT Agent Orc
 ## Architecture Philosophy
 
 Following our **"Excellence through Rigor"** philosophy, configuration management is:
-- **Centralized**: All configuration in one location
-- **Environment Agnostic**: Works across development, staging, production
-- **Validated**: Configuration validation at startup
-- **Secure**: Sensitive data handled appropriately
+- **Centralized**: All configuration in one location following **"Single source of truth"**
+- **Environment Agnostic**: Works across development, staging, deployment environments
+- **Validated**: Configuration validation at startup implementing **"Fail fast, fail loud"**
+- **Secure**: Sensitive data handled appropriately with **"Least privilege"** access
 
 ## Configuration Files
 
@@ -256,22 +256,22 @@ mcp:
     enable_debug: true
 ```
 
-**Production Configuration**:
+**Deployment Configuration**:
 ```yaml
-# configs/production.yaml
-environment: "production"
+# configs/deployment.yaml
+environment: "deployment"
 debug: false
 log_level: "info"
 
 models:
   qwen-omni:
-    memory_limit: 3072  # Full memory allocation
+    memory_limit: 3072  # Full memory allocation for stable operation
     parameters:
-      temperature: "0.7"  # Conservative settings
+      temperature: "0.7"  # Conservative settings for consistent results
 
 mcp:
   client:
-    timeout: "30s"  # Strict timeout for production
+    timeout: "30s"  # Strict timeout for stable operation
     enable_debug: false
   security:
     enable_tls: true
@@ -460,7 +460,7 @@ configs/
 ├── models.yaml              # Model configuration
 ├── mcp.yaml                 # MCP service configuration
 ├── development.yaml         # Development environment overrides
-├── production.yaml          # Production environment overrides
+├── deployment.yaml          # Deployment environment overrides
 ├── schema.yaml              # Configuration schema
 ├── template.yaml            # Configuration template
 └── secrets.yaml.gpg         # Encrypted secrets
