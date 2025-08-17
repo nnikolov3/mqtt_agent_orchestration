@@ -9,8 +9,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/mqtt"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // EmbeddingWorker handles embedding requests via MQTT

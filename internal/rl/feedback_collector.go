@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/rag"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/rag"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // FeedbackType represents different types of feedback

@@ -12,6 +12,8 @@ Autonomous AI agent orchestration implementing role-based workflow coordination.
 **AI Integration**: Intelligent routing between local GGUF models and external AI services
 **Error Handling**: **"Fail Fast, Fail Loud"** with comprehensive diagnostics and recovery
 
+> **Note**: This is a backend-only system without web UI components. See [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) for details.
+
 ## System Components
 
 ### Core Services
@@ -33,7 +35,7 @@ Autonomous AI agent orchestration implementing role-based workflow coordination.
 ## System Prerequisites
 
 ### Required Dependencies
-- **Go 1.24+**: Primary development language with latest features
+- **Go 1.22+**: Primary development language with latest features
 - **MQTT Broker**: Mosquitto or compatible (default port: 1883)
 - **Vector Database**: Qdrant local binary (searched in PATH, then `bin/qdrant`)
 
@@ -277,8 +279,8 @@ Following **"Continuous improvement"** and **"Validate, analyze, refactor"** pri
 // Task outcome analysis with comprehensive metrics
 import (
   "time"
-  "github.com/niko/mqtt-agent-orchestration/internal/rl"
-  "github.com/niko/mqtt-agent-orchestration/internal/rag"
+  "github.com/nnikolov3/mqtt-agent-orchestration/internal/rl"
+  "github.com/nnikolov3/mqtt-agent-orchestration/internal/rag"
 )
 
 func implementFeedbackCollection() error {

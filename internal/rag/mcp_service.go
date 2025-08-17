@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/mcp"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/mcp"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // MCPService provides RAG functionality using MCP for enhanced capabilities

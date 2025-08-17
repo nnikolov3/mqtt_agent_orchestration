@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // TaskProcessor defines the interface for processing tasks

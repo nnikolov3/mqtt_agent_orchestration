@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/rag"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/rag"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // UserRAGManager provides a user-level RAG service for cross-project usage

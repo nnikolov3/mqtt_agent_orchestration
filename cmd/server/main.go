@@ -8,8 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/mqtt"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // Configuration constants

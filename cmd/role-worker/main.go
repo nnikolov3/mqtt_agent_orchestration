@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/ai"
-	"github.com/niko/mqtt-agent-orchestration/internal/localmodels"
-	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
-	"github.com/niko/mqtt-agent-orchestration/internal/rag"
-	"github.com/niko/mqtt-agent-orchestration/internal/worker"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/ai"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/localmodels"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/mqtt"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/rag"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/worker"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // Configuration constants

@@ -212,11 +212,3 @@ These principles are non-negotiable foundations for robust, maintainable, and sc
 
 <div style="text-align: center">⁂</div>
 
-[^1]: DESIGN_PRINCIPLES.md
-
-[^2]: GO_CODING_STANDARD.md
-
-[^3]: BASH_CODING_STANDARD_CLAUDE.md
-
-[^4]: Design_Principles.md
-

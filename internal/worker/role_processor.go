@@ -6,10 +6,10 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/ai"
-	"github.com/niko/mqtt-agent-orchestration/internal/localmodels"
-	"github.com/niko/mqtt-agent-orchestration/internal/rag"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/ai"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/localmodels"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/rag"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // RoleBasedProcessor implements role-specific task processing
