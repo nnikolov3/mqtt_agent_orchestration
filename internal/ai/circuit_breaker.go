@@ -51,16 +51,16 @@ func DefaultCircuitBreakerConfig() CircuitBreakerConfig {
 
 // CircuitBreaker implements the circuit breaker pattern for provider resilience
 type CircuitBreaker struct {
-	mu               sync.RWMutex
-	config           CircuitBreakerConfig
-	state            CircuitState
-	failures         int
-	successes        int
-	requests         int
-	lastFailureTime  time.Time
-	lastTransition   time.Time
-	requestWindow    []requestRecord
-	providerName     string
+	mu              sync.RWMutex
+	config          CircuitBreakerConfig
+	state           CircuitState
+	failures        int
+	successes       int
+	requests        int
+	lastFailureTime time.Time
+	lastTransition  time.Time
+	requestWindow   []requestRecord
+	providerName    string
 }
 
 // requestRecord tracks individual request outcomes
@@ -219,7 +219,7 @@ func (cb *CircuitBreaker) reset() {
 // cleanWindow removes old entries from the rolling window
 func (cb *CircuitBreaker) cleanWindow(now time.Time) {
 	cutoff := now.Add(-cb.config.WindowSize)
-	
+
 	// Find first entry within window
 	start := 0
 	for i, record := range cb.requestWindow {
@@ -261,33 +261,33 @@ func (cb *CircuitBreaker) GetStats() CircuitBreakerStats {
 	}
 
 	return CircuitBreakerStats{
-		Provider:         cb.providerName,
-		State:            cb.state,
-		Failures:         cb.failures,
-		Successes:        cb.successes,
-		Requests:         cb.requests,
-		WindowFailures:   windowFailures,
-		WindowRequests:   len(cb.requestWindow),
-		FailureRate:      failureRate,
-		LastFailureTime:  cb.lastFailureTime,
-		LastTransition:   cb.lastTransition,
-		TimeInState:      time.Since(cb.lastTransition),
+		Provider:        cb.providerName,
+		State:           cb.state,
+		Failures:        cb.failures,
+		Successes:       cb.successes,
+		Requests:        cb.requests,
+		WindowFailures:  windowFailures,
+		WindowRequests:  len(cb.requestWindow),
+		FailureRate:     failureRate,
+		LastFailureTime: cb.lastFailureTime,
+		LastTransition:  cb.lastTransition,
+		TimeInState:     time.Since(cb.lastTransition),
 	}
 }
 
 // CircuitBreakerStats contains circuit breaker metrics
 type CircuitBreakerStats struct {
-	Provider         string        `json:"provider"`
-	State            CircuitState  `json:"state"`
-	Failures         int           `json:"failures"`
-	Successes        int           `json:"successes"`
-	Requests         int           `json:"requests"`
-	WindowFailures   int           `json:"window_failures"`
-	WindowRequests   int           `json:"window_requests"`
-	FailureRate      float64       `json:"failure_rate"`
-	LastFailureTime  time.Time     `json:"last_failure_time"`
-	LastTransition   time.Time     `json:"last_transition"`
-	TimeInState      time.Duration `json:"time_in_state"`
+	Provider        string        `json:"provider"`
+	State           CircuitState  `json:"state"`
+	Failures        int           `json:"failures"`
+	Successes       int           `json:"successes"`
+	Requests        int           `json:"requests"`
+	WindowFailures  int           `json:"window_failures"`
+	WindowRequests  int           `json:"window_requests"`
+	FailureRate     float64       `json:"failure_rate"`
+	LastFailureTime time.Time     `json:"last_failure_time"`
+	LastTransition  time.Time     `json:"last_transition"`
+	TimeInState     time.Duration `json:"time_in_state"`
 }
 
 // CircuitBreakerError represents circuit breaker related errors

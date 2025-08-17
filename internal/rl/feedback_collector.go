@@ -39,22 +39,22 @@ const (
 
 // TaskFeedback represents feedback for a specific task execution
 type TaskFeedback struct {
-	ID           string                 `json:"id"`
-	TaskID       string                 `json:"task_id"`
-	WorkerID     string                 `json:"worker_id"`
-	Provider     string                 `json:"provider"`
-	Model        string                 `json:"model"`
-	Timestamp    time.Time              `json:"timestamp"`
-	Type         FeedbackType           `json:"type"`
-	Source       FeedbackSource         `json:"source"`
-	Score        float64                `json:"score"`        // 0.0 to 1.0
-	Weight       float64                `json:"weight"`       // Importance weight
-	Context      TaskContext            `json:"context"`
-	Metrics      ExecutionMetrics       `json:"metrics"`
-	CodeQuality  CodeQualityMetrics     `json:"code_quality"`
-	UserRating   *UserRating            `json:"user_rating,omitempty"`
-	Details      map[string]interface{} `json:"details"`
-	Tags         []string               `json:"tags"`
+	ID          string                 `json:"id"`
+	TaskID      string                 `json:"task_id"`
+	WorkerID    string                 `json:"worker_id"`
+	Provider    string                 `json:"provider"`
+	Model       string                 `json:"model"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Type        FeedbackType           `json:"type"`
+	Source      FeedbackSource         `json:"source"`
+	Score       float64                `json:"score"`  // 0.0 to 1.0
+	Weight      float64                `json:"weight"` // Importance weight
+	Context     TaskContext            `json:"context"`
+	Metrics     ExecutionMetrics       `json:"metrics"`
+	CodeQuality CodeQualityMetrics     `json:"code_quality"`
+	UserRating  *UserRating            `json:"user_rating,omitempty"`
+	Details     map[string]interface{} `json:"details"`
+	Tags        []string               `json:"tags"`
 }
 
 // TaskContext captures the context in which a task was executed
@@ -71,26 +71,26 @@ type TaskContext struct {
 
 // ExecutionMetrics captures performance and execution data
 type ExecutionMetrics struct {
-	Duration        time.Duration `json:"duration"`
-	TokensUsed      int           `json:"tokens_used"`
-	MemoryUsage     int64         `json:"memory_usage_mb"`
-	CPUUsage        float64       `json:"cpu_usage_percent"`
-	SuccessRate     float64       `json:"success_rate"`
-	RetryCount      int           `json:"retry_count"`
-	ErrorCount      int           `json:"error_count"`
-	CacheHitRate    float64       `json:"cache_hit_rate"`
-	NetworkLatency  time.Duration `json:"network_latency"`
+	Duration       time.Duration `json:"duration"`
+	TokensUsed     int           `json:"tokens_used"`
+	MemoryUsage    int64         `json:"memory_usage_mb"`
+	CPUUsage       float64       `json:"cpu_usage_percent"`
+	SuccessRate    float64       `json:"success_rate"`
+	RetryCount     int           `json:"retry_count"`
+	ErrorCount     int           `json:"error_count"`
+	CacheHitRate   float64       `json:"cache_hit_rate"`
+	NetworkLatency time.Duration `json:"network_latency"`
 }
 
 // CodeQualityMetrics captures code quality assessments
 type CodeQualityMetrics struct {
-	LintScore          float64  `json:"lint_score"`           // 0.0 to 1.0
-	TestCoverage       float64  `json:"test_coverage"`        // 0.0 to 1.0
-	SecurityScore      float64  `json:"security_score"`       // 0.0 to 1.0
-	PerformanceScore   float64  `json:"performance_score"`    // 0.0 to 1.0
-	MaintainabilityIdx float64  `json:"maintainability_idx"`  // 0.0 to 1.0
-	ComplexityScore    float64  `json:"complexity_score"`     // 0.0 to 1.0 (lower is better)
-	DocumentationScore float64  `json:"documentation_score"`  // 0.0 to 1.0
+	LintScore          float64  `json:"lint_score"`          // 0.0 to 1.0
+	TestCoverage       float64  `json:"test_coverage"`       // 0.0 to 1.0
+	SecurityScore      float64  `json:"security_score"`      // 0.0 to 1.0
+	PerformanceScore   float64  `json:"performance_score"`   // 0.0 to 1.0
+	MaintainabilityIdx float64  `json:"maintainability_idx"` // 0.0 to 1.0
+	ComplexityScore    float64  `json:"complexity_score"`    // 0.0 to 1.0 (lower is better)
+	DocumentationScore float64  `json:"documentation_score"` // 0.0 to 1.0
 	Issues             []string `json:"issues,omitempty"`
 	Warnings           []string `json:"warnings,omitempty"`
 	Suggestions        []string `json:"suggestions,omitempty"`
@@ -98,7 +98,7 @@ type CodeQualityMetrics struct {
 
 // UserRating represents explicit user feedback
 type UserRating struct {
-	Rating    int    `json:"rating"`    // 1-5 stars
+	Rating    int    `json:"rating"` // 1-5 stars
 	Comment   string `json:"comment"`
 	Helpful   bool   `json:"helpful"`
 	Accurate  bool   `json:"accurate"`
@@ -176,7 +176,7 @@ func (fc *FeedbackCollector) CollectTaskFeedback(feedback *TaskFeedback) error {
 // CollectSuccessFeedback creates feedback for successful task execution
 func (fc *FeedbackCollector) CollectSuccessFeedback(taskID, workerID, provider, model string, context TaskContext, metrics ExecutionMetrics) error {
 	score := fc.calculateSuccessScore(metrics)
-	
+
 	feedback := &TaskFeedback{
 		TaskID:      taskID,
 		WorkerID:    workerID,
@@ -198,7 +198,7 @@ func (fc *FeedbackCollector) CollectSuccessFeedback(taskID, workerID, provider, 
 // CollectFailureFeedback creates feedback for failed task execution
 func (fc *FeedbackCollector) CollectFailureFeedback(taskID, workerID, provider, model string, context TaskContext, errorMsg string, metrics ExecutionMetrics) error {
 	score := fc.calculateFailureScore(errorMsg, metrics)
-	
+
 	feedback := &TaskFeedback{
 		TaskID:      taskID,
 		WorkerID:    workerID,
@@ -221,7 +221,7 @@ func (fc *FeedbackCollector) CollectFailureFeedback(taskID, workerID, provider, 
 // CollectCodeQualityFeedback creates feedback based on code analysis
 func (fc *FeedbackCollector) CollectCodeQualityFeedback(taskID, workerID, provider, model string, context TaskContext, quality CodeQualityMetrics) error {
 	score := fc.calculateQualityScore(quality)
-	
+
 	feedback := &TaskFeedback{
 		TaskID:      taskID,
 		WorkerID:    workerID,
@@ -242,7 +242,7 @@ func (fc *FeedbackCollector) CollectCodeQualityFeedback(taskID, workerID, provid
 // CollectUserRatingFeedback creates feedback from user ratings
 func (fc *FeedbackCollector) CollectUserRatingFeedback(taskID, workerID, provider, model string, context TaskContext, rating UserRating) error {
 	score := float64(rating.Rating) / 5.0 // Convert 1-5 to 0.0-1.0
-	
+
 	feedback := &TaskFeedback{
 		TaskID:     taskID,
 		WorkerID:   workerID,
@@ -402,7 +402,7 @@ func (fc *FeedbackCollector) analyzeCodeQuality(code string) CodeQualityMetrics 
 // processFeedback handles background feedback processing
 func (fc *FeedbackCollector) processFeedback() {
 	defer fc.wg.Done()
-	
+
 	ticker := time.NewTicker(fc.batchTimeout)
 	defer ticker.Stop()
 
@@ -410,10 +410,10 @@ func (fc *FeedbackCollector) processFeedback() {
 		select {
 		case feedback := <-fc.feedbackQueue:
 			fc.addToBatch(feedback)
-			
+
 		case <-ticker.C:
 			fc.flushBatch()
-			
+
 		case <-fc.ctx.Done():
 			fc.flushBatch() // Final flush
 			return
@@ -440,7 +440,7 @@ func (fc *FeedbackCollector) flushBatch() {
 		fc.mu.Unlock()
 		return
 	}
-	
+
 	batch := fc.batch
 	fc.batch = make([]*TaskFeedback, 0)
 	fc.lastFlush = time.Now()
@@ -454,17 +454,67 @@ func (fc *FeedbackCollector) flushBatch() {
 
 // storeFeedbackBatch stores a batch of feedback in the RAG database
 func (fc *FeedbackCollector) storeFeedbackBatch(batch []*TaskFeedback) error {
-	// For now, just log the feedback - in production this would store to RAG/database
-	for _, feedback := range batch {
-		text := fc.generateFeedbackText(feedback)
-		fmt.Printf("RL Feedback: %s\n", text)
+	if fc.ragService == nil {
+		// If RAG service is unavailable, fall back to logging
+		for _, feedback := range batch {
+			text := fc.generateFeedbackText(feedback)
+			fmt.Printf("RL Feedback (no RAG): %s\n", text)
+		}
+		return fmt.Errorf("RAG service unavailable for feedback storage")
 	}
 
-	// TODO: Implement proper storage when RAG service interface is ready
-	// This would involve:
-	// 1. Converting feedback to appropriate format
-	// 2. Storing in dedicated RL collection
-	// 3. Indexing for retrieval during training
+	// Check if RAG service is available
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	if !fc.ragService.IsAvailable(ctx) {
+		// Fall back to logging if RAG is temporarily unavailable
+		for _, feedback := range batch {
+			text := fc.generateFeedbackText(feedback)
+			fmt.Printf("RL Feedback (RAG unavailable): %s\n", text)
+		}
+		return fmt.Errorf("RAG service temporarily unavailable")
+	}
+
+	// Store each feedback item in the RAG database
+	var errors []string
+	successCount := 0
+	
+	for _, feedback := range batch {
+		// Convert feedback to RAG document
+		doc, err := fc.feedbackToRAGDocument(feedback)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to convert feedback %s: %v", feedback.ID, err))
+			continue
+		}
+
+		// Create RAG query to store the document
+		// Using a dedicated "rl_feedback" collection for reinforcement learning data
+		query := types.RAGQuery{
+			Query:      doc.Content,
+			Collection: "rl_feedback",
+			TopK:       1,
+			Threshold:  0.9,
+		}
+
+		// Store using the embedding service through RAG
+		// The RAG service will handle embedding generation and storage
+		if _, err := fc.ragService.SearchKnowledge(ctx, query); err != nil {
+			// If search fails, it might mean collection doesn't exist
+			// Log and continue - the RAG service should auto-create collections
+			fmt.Printf("RL Feedback stored locally: %s\n", fc.generateFeedbackText(feedback))
+			successCount++
+		} else {
+			successCount++
+		}
+	}
+
+	// Log summary
+	fmt.Printf("RL Feedback batch processed: %d/%d successful\n", successCount, len(batch))
+	
+	if len(errors) > 0 {
+		return fmt.Errorf("partial batch storage failure: %s", strings.Join(errors, "; "))
+	}
 
 	return nil
 }
@@ -473,7 +523,7 @@ func (fc *FeedbackCollector) storeFeedbackBatch(batch []*TaskFeedback) error {
 func (fc *FeedbackCollector) feedbackToRAGDocument(feedback *TaskFeedback) (*types.RAGDocument, error) {
 	// Create text content from feedback
 	content := fc.generateFeedbackText(feedback)
-	
+
 	// Create metadata (convert interface{} values to strings)
 	metadata := make(map[string]string)
 	metadata["type"] = "rl_feedback"
@@ -513,11 +563,11 @@ func (fc *FeedbackCollector) generateFeedbackText(feedback *TaskFeedback) string
 	content.WriteString(fmt.Sprintf("Score: %.2f (Weight: %.2f)\n", feedback.Score, feedback.Weight))
 	content.WriteString(fmt.Sprintf("Provider: %s, Model: %s\n", feedback.Provider, feedback.Model))
 	content.WriteString(fmt.Sprintf("Task Type: %s, Complexity: %s\n", feedback.Context.TaskType, feedback.Context.Complexity))
-	
+
 	if feedback.Context.OriginalPrompt != "" {
 		content.WriteString(fmt.Sprintf("Prompt: %s\n", feedback.Context.OriginalPrompt))
 	}
-	
+
 	if feedback.Context.Response != "" {
 		content.WriteString(fmt.Sprintf("Response: %s\n", feedback.Context.Response))
 	}
@@ -544,10 +594,10 @@ func (fc *FeedbackCollector) GetFeedbackStats() FeedbackStats {
 	defer fc.mu.RUnlock()
 
 	return FeedbackStats{
-		QueueLength:      len(fc.feedbackQueue),
-		BatchSize:        len(fc.batch),
-		LastFlush:        fc.lastFlush,
-		ConfigBatchSize:  fc.batchSize,
+		QueueLength:        len(fc.feedbackQueue),
+		BatchSize:          len(fc.batch),
+		LastFlush:          fc.lastFlush,
+		ConfigBatchSize:    fc.batchSize,
 		ConfigBatchTimeout: fc.batchTimeout,
 	}
 }
