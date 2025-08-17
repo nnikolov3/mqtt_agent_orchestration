@@ -25,14 +25,14 @@ description = "High-quality text generation and reasoning. Nemotron models excel
 
 [nvidia_ocr]
 api_key_variable = "NVIDIA_API_KEY"
-# NVIDIA OCR service - separate from text generation
+# NVIDIA OCR service - correct JSON payload format for image_url
 models = ["nvidia/nemoretriever-ocr-v1"]
 max_tokens = 8192
 temperature = 0.1
 top_p = 0.95
 timeout = 60
 api_url = "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1"
-description = "OCR service for extracting text from images. Use specifically for document processing and visual text extraction."
+description = "OCR service for extracting text from images. Uses input array with image_url type and data:image/png;base64 format."
 
 [gemini]
 api_key_variable = "GEMINI_API_KEY"

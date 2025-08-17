@@ -22,9 +22,10 @@ import (
 
 // Configuration constants
 const (
-	DefaultMQTTHost      = "localhost"
-	DefaultMQTTPort      = 1883
-	DefaultQdrantURL     = "localhost:6333"
+	DefaultMQTTHost = "localhost"
+	DefaultMQTTPort = 1883
+	// Qdrant gRPC listens on 6334 by default; HTTP is 6333. We use gRPC here.
+	DefaultQdrantURL     = "localhost:6334"
 	StatusUpdateInterval = 30 * time.Second
 	TaskTimeout          = 10 * time.Minute
 )
@@ -238,6 +239,11 @@ func (app *RoleWorkerApp) publishStatusPeriodically() {
 	for {
 		select {
 		case <-ticker.C:
+			caps := worker.GetCapabilitiesForRole(app.role)
+			capList := []string{}
+			for _, r := range caps.Roles {
+				capList = append(capList, string(r))
+			}
 			status := types.ExtendedWorkerStatus{
 				WorkerStatus: types.WorkerStatus{
 					ID:       app.workerID,
@@ -245,7 +251,7 @@ func (app *RoleWorkerApp) publishStatusPeriodically() {
 					LastSeen: time.Now(),
 				},
 				Role:         app.role,
-				Capabilities: worker.GetCapabilitiesForRole(app.role),
+				Capabilities: capList,
 			}
 
 			data, err := json.Marshal(status)

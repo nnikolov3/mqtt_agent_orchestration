@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
+	"github.com/niko/mqtt-agent-orchestration/pkg/types"
 )
 
 // Configuration constants
@@ -77,6 +78,48 @@ func (c *WorkflowClient) CreateDocument(docType, outputFile string) error {
 	return c.mqttClient.Publish(ctx, "orchestrator/workflow", data)
 }
 
+// SubmitWorkflow submits a new workflow to the orchestrator
+func (c *WorkflowClient) SubmitWorkflow(content, complexity string) error {
+	req := types.SubmitWorkflowRequest{
+		Content:    content,
+		Complexity: complexity,
+	}
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal workflow request: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+	defer cancel()
+
+	log.Printf("Submitting workflow...")
+	return c.mqttClient.Publish(ctx, "workflow/submit", data)
+}
+
+// ListWorkers lists all available workers
+func (c *WorkflowClient) ListWorkers() error {
+	log.Println("Listing available workers...")
+
+	// Subscribe to worker status topic
+	topic := "workers/status/+/+"
+	if err := c.mqttClient.Subscribe(c.ctx, topic, func(payload []byte) {
+		var status types.ExtendedWorkerStatus
+		if err := json.Unmarshal(payload, &status); err != nil {
+			log.Printf("Failed to unmarshal worker status: %v", err)
+			return
+		}
+		fmt.Printf("Worker ID: %s, Role: %s, Status: %s\n", status.ID, status.Role, status.Status)
+	}); err != nil {
+		return fmt.Errorf("failed to subscribe to worker status topic: %w", err)
+	}
+
+	// Wait for a few seconds to receive status updates
+	time.Sleep(3 * time.Second)
+
+	return nil
+}
+
 // ListAvailableDocuments returns available document types
 func (c *WorkflowClient) ListAvailableDocuments() []string {
 	return []string{
@@ -105,15 +148,19 @@ func (c *WorkflowClient) ListAvailableModels() ([]string, error) {
 func main() {
 	// Parse command line flags
 	var (
-		mqttHost    = flag.String("mqtt-host", DefaultMQTTHost, "MQTT broker host")
-		mqttPort    = flag.Int("mqtt-port", DefaultMQTTPort, "MQTT broker port")
-		docType     = flag.String("doc-type", "", "Document type to create")
-		outputFile  = flag.String("output", "", "Output file path")
-		list        = flag.Bool("list", false, "List available document types")
-		listModels  = flag.Bool("list-models", false, "List available local models")
-		preferLocal = flag.Bool("prefer-local", false, "Prefer local models over external AI helpers")
-		modelType   = flag.String("model-type", "", "Specify model type for task")
-		verbose     = flag.Bool("verbose", false, "Enable verbose logging")
+		mqttHost           = flag.String("mqtt-host", DefaultMQTTHost, "MQTT broker host")
+		mqttPort           = flag.Int("mqtt-port", DefaultMQTTPort, "MQTT broker port")
+		docType            = flag.String("doc-type", "", "Document type to create")
+		outputFile         = flag.String("output", "", "Output file path")
+		list               = flag.Bool("list", false, "List available document types")
+		listModels         = flag.Bool("list-models", false, "List available local models")
+		listWorkers        = flag.Bool("list-workers", false, "List available workers")
+		submitWorkflow     = flag.Bool("submit-workflow", false, "Submit a new workflow")
+		workflowContent    = flag.String("content", "", "Content for the workflow")
+		workflowComplexity = flag.String("complexity", "medium", "Complexity of the workflow")
+		preferLocal        = flag.Bool("prefer-local", false, "Prefer local models over external AI helpers")
+		modelType          = flag.String("model-type", "", "Specify model type for task")
+		verbose            = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
 
@@ -149,6 +196,24 @@ func main() {
 		for _, model := range models {
 			fmt.Printf("  - %s\n", model)
 		}
+		return
+	}
+
+	if *listWorkers {
+		if err := client.ListWorkers(); err != nil {
+			log.Fatalf("Failed to list workers: %v", err)
+		}
+		return
+	}
+
+	if *submitWorkflow {
+		if *workflowContent == "" {
+			log.Fatal("Please provide --content for the workflow")
+		}
+		if err := client.SubmitWorkflow(*workflowContent, *workflowComplexity); err != nil {
+			log.Fatalf("Failed to submit workflow: %v", err)
+		}
+		log.Println("Workflow submitted successfully")
 		return
 	}
 

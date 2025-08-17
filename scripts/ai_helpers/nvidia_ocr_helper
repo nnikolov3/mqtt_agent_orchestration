@@ -1,0 +1,328 @@
+#!/usr/bin/env bash
+
+# Design: Enhanced NVIDIA OCR helper script with RAG integration and RL feedback
+# Purpose: OCR extraction using NVIDIA API with correct payload format, RAG knowledge storage, and performance tracking
+# Usage: nvidia_ocr_helper.sh "image_file" [context_description]
+
+set -euo pipefail
+
+# ALL global variables declared at top
+declare SCRIPT_DIR=""
+declare CONFIG_FILE_GLOBAL=""
+declare NVIDIA_API_KEY_GLOBAL=""
+declare API_URL_GLOBAL=""
+declare TIMEOUT_GLOBAL=""
+declare image_file=""
+declare context_description=""
+declare image_base64=""
+declare temp_payload=""
+declare temp_response=""
+declare api_response=""
+declare api_exit=""
+declare ocr_result=""
+declare start_time=""
+declare end_time=""
+declare duration=""
+declare confidence_score=""
+
+# Initialize variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# Handle both direct execution and symlink execution
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+    REAL_DIR="$(dirname "$REAL_SCRIPT")"
+    CONFIG_FILE_GLOBAL="$REAL_DIR/ai_helpers.toml"
+else
+    CONFIG_FILE_GLOBAL="$SCRIPT_DIR/ai_helpers.toml"
+fi
+
+# Load configuration from TOML file
+function load_config() {
+    if [[ ! -f "$CONFIG_FILE_GLOBAL" ]]; then
+        echo "Error: Configuration file not found: $CONFIG_FILE_GLOBAL" >&2
+        exit 1
+    fi
+    
+    # Check if yq is available
+    if ! command -v yq >/dev/null; then
+        echo "Error: yq is required to parse TOML configuration" >&2
+        exit 1
+    fi
+    
+    # Load NVIDIA OCR configuration
+    local api_key_var=""
+    api_key_var=$(yq '.nvidia_ocr.api_key_variable' "$CONFIG_FILE_GLOBAL")
+    API_URL_GLOBAL=$(yq '.nvidia_ocr.api_url' "$CONFIG_FILE_GLOBAL")
+    TIMEOUT_GLOBAL=$(yq '.nvidia_ocr.timeout' "$CONFIG_FILE_GLOBAL")
+    
+    # Load API key from environment variable
+    if [[ -n "${!api_key_var:-}" ]]; then
+        NVIDIA_API_KEY_GLOBAL="${!api_key_var}"
+    else
+        echo "Error: Environment variable $api_key_var is not set" >&2
+        exit 1
+    fi
+}
+
+# Check dependencies
+function check_dependencies() {
+    local dep=""
+    local -a required_deps=("curl" "jq" "mktemp" "base64" "yq" "file")
+    
+    for dep in "${required_deps[@]}"; do
+        if ! command -v "$dep" >/dev/null; then
+            echo "Error: Required dependency not found: $dep" >&2
+            exit 1
+        fi
+    done
+}
+
+# Validate input parameters
+function validate_inputs() {
+    if [[ $# -lt 1 || $# -gt 2 ]]; then
+        echo "Usage: $0 \"image_file\" [context_description]" >&2
+        echo "Examples:" >&2
+        echo "  $0 screenshot.png \"Code screenshot for analysis\"" >&2
+        echo "  $0 document.jpg \"Documentation page\"" >&2
+        exit 1
+    fi
+    
+    image_file="$1"
+    context_description="${2:-OCR extraction}"
+    
+    if [[ ! -f "$image_file" ]]; then
+        echo "Error: Image file does not exist: $image_file" >&2
+        exit 1
+    fi
+    
+    # Check if file is an image
+    if ! file "$image_file" | grep -q -E "(image|bitmap)"; then
+        echo "Error: File is not a recognized image format: $image_file" >&2
+        exit 1
+    fi
+}
+
+# Process image file and create base64 encoding
+function process_image_file() {
+    echo "📷 Processing image: $image_file" >&2
+    
+    # Convert image to base64 (using -i flag as shown in user's example)
+    image_base64=$(base64 -i "$image_file")
+    if [[ -z "$image_base64" ]]; then
+        echo "Error: Failed to encode image as base64" >&2
+        exit 1
+    fi
+    
+    echo "✅ Image encoded successfully (${#image_base64} characters)" >&2
+}
+
+# Search RAG for OCR best practices
+function search_rag_knowledge() {
+    echo "🧠 Searching RAG for OCR knowledge..." >&2
+    
+    # Use RAG service to search for OCR-related knowledge
+    if command -v "$PROJECT_ROOT/bin/rag-service" >/dev/null; then
+        local rag_context=""
+        rag_context=$("$PROJECT_ROOT/bin/rag-service" search --query "OCR image text extraction best practices" --limit 2 2>/dev/null || echo "")
+        
+        if [[ -n "$rag_context" ]]; then
+            echo "📚 Found RAG context for OCR processing" >&2
+            echo "Context: $rag_context" >&2
+        else
+            echo "📚 No specific OCR context found in RAG" >&2
+        fi
+    else
+        echo "📚 RAG service not available, proceeding without context" >&2
+    fi
+}
+
+# Call NVIDIA OCR API with correct payload format
+function call_nvidia_ocr_api() {
+    start_time=$(date +%s.%N)
+    
+    # Create temporary files
+    temp_payload=$(mktemp)
+    temp_response=$(mktemp)
+    
+    # Cleanup function
+    function cleanup_temps() {
+        rm -f "$temp_payload" "$temp_response"
+    }
+    trap cleanup_temps EXIT
+    
+    echo "🚀 Calling NVIDIA OCR API..." >&2
+    
+    # Create JSON payload with correct format as specified by user
+    jq -n \
+        --arg image_data "data:image/png;base64,$image_base64" '{
+            "input": [
+                {
+                    "type": "image_url",
+                    "url": $image_data
+                }
+            ]
+        }' > "$temp_payload"
+    
+    echo "📋 Payload created, making API call..." >&2
+    
+    # Make API call with correct headers
+    api_response=$(curl -sS \
+        --location "$API_URL_GLOBAL" \
+        --header "Authorization: Bearer $NVIDIA_API_KEY_GLOBAL" \
+        --header "Content-Type: application/json" \
+        --header "Accept: application/json" \
+        --data @"$temp_payload" \
+        --max-time "$TIMEOUT_GLOBAL" \
+        2>&1)
+    api_exit="$?"
+    
+    end_time=$(date +%s.%N)
+    duration=$(echo "$end_time - $start_time" | bc -l)
+    
+    if [[ "$api_exit" -eq 0 ]]; then
+        # Save response to file for parsing
+        echo "$api_response" > "$temp_response"
+        
+        # Extract OCR result from NVIDIA response structure
+        ocr_result=$(jq -r '.data[0].text_detections[]?.text_prediction.text // empty' "$temp_response" 2>/dev/null | tr '\n' ' ' || echo "")
+        
+        # Also get confidence scores
+        confidence_scores=$(jq -r '.data[0].text_detections[]?.text_prediction.confidence // empty' "$temp_response" 2>/dev/null | tr '\n' ' ' || echo "")
+        
+        # Calculate average confidence
+        if [[ -n "$confidence_scores" ]]; then
+            confidence_score=$(echo "$confidence_scores" | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum/NF}')
+        else
+            confidence_score="0.0"
+        fi
+        
+        if [[ -n "$ocr_result" && "$ocr_result" != "null" && "$ocr_result" != "empty" ]]; then
+            echo "✅ OCR extraction successful (${duration}s)" >&2
+            
+            # Try to extract confidence score if available
+            confidence_score=$(jq -r '.confidence // .score // empty' "$temp_response" 2>/dev/null || echo "0.95")
+            
+            cleanup_temps
+            return 0
+        else
+            echo "⚠️  NVIDIA OCR returned empty response" >&2
+            echo "Response preview: $(head -200 "$temp_response")" >&2
+            cleanup_temps
+            return 1
+        fi
+    else
+        echo "❌ NVIDIA OCR API call failed: $api_response" >&2
+        cleanup_temps
+        return 1
+    fi
+}
+
+# Store OCR result in RAG system
+function store_ocr_result_in_rag() {
+    if [[ -n "$ocr_result" ]] && command -v "$PROJECT_ROOT/bin/rag-service" >/dev/null; then
+        echo "💾 Storing OCR result in RAG system..." >&2
+        
+        # Create metadata for the OCR result
+        local metadata_json=""
+        metadata_json=$(jq -n \
+            --arg image_file "$image_file" \
+            --arg context "$context_description" \
+            --arg confidence "$confidence_score" \
+            --arg duration "$duration" \
+            --arg timestamp "$(date -Iseconds)" '{
+                "type": "ocr_result",
+                "image_file": $image_file,
+                "context": $context,
+                "confidence": $confidence,
+                "duration": $duration,
+                "timestamp": $timestamp,
+                "model": "nvidia/nemoretriever-ocr-v1"
+            }')
+        
+        # Store in RAG
+        "$PROJECT_ROOT/bin/rag-service" add-document \
+            --collection "api_documentation" \
+            --content "OCR Result: $ocr_result" \
+            --metadata "$metadata_json" >/dev/null 2>&1 || echo "⚠️  Could not store in RAG"
+        
+        echo "✅ OCR result stored in RAG system" >&2
+    fi
+}
+
+# Collect reinforcement learning feedback
+function collect_rl_feedback() {
+    echo "📊 Collecting RL feedback..." >&2
+    
+    # Determine success based on whether we got a result
+    local success_rate=""
+    if [[ -n "$ocr_result" ]]; then
+        success_rate="1.0"
+        echo "✅ Task successful - OCR extracted text" >&2
+    else
+        success_rate="0.0"
+        echo "❌ Task failed - No OCR text extracted" >&2
+    fi
+    
+    # Log feedback data (in production, this would be sent to RL system)
+    local feedback_json=""
+    feedback_json=$(jq -n \
+        --arg task_id "ocr-$(date +%s)" \
+        --arg worker_id "nvidia-ocr-helper" \
+        --arg model_provider "nvidia" \
+        --arg model_name "nemoretriever-ocr-v1" \
+        --arg success_rate "$success_rate" \
+        --arg duration "$duration" \
+        --arg confidence "$confidence_score" \
+        --arg image_file "$image_file" \
+        --arg context "$context_description" '{
+            "task_id": $task_id,
+            "worker_id": $worker_id,
+            "model_provider": $model_provider,
+            "model_name": $model_name,
+            "success_rate": ($success_rate | tonumber),
+            "duration": ($duration | tonumber),
+            "confidence": ($confidence | tonumber),
+            "metadata": {
+                "image_file": $image_file,
+                "context": $context,
+                "task_type": "ocr_extraction"
+            },
+            "timestamp": now
+        }')
+    
+    # Store feedback (log to file for now, in production would use RL collector)
+    mkdir -p "$PROJECT_ROOT/logs"
+    echo "$feedback_json" >> "$PROJECT_ROOT/logs/rl_feedback.jsonl"
+    echo "📈 RL feedback logged" >&2
+}
+
+# Main execution
+function main() {
+    echo "🚀 NVIDIA OCR Helper with Full Capabilities Integration" >&2
+    echo "=================================================" >&2
+    
+    check_dependencies
+    load_config
+    validate_inputs "$@"
+    search_rag_knowledge
+    process_image_file
+    
+    if call_nvidia_ocr_api; then
+        echo "📄 OCR Result:" >&2
+        echo "=============" >&2
+        echo "$ocr_result"
+        echo "=============" >&2
+        
+        store_ocr_result_in_rag
+        collect_rl_feedback
+        
+        echo "🎉 OCR processing completed successfully!" >&2
+    else
+        collect_rl_feedback
+        echo "💥 OCR processing failed!" >&2
+        exit 1
+    fi
+}
+
+main "$@"

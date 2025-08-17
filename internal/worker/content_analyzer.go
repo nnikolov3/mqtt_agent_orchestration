@@ -33,17 +33,33 @@ type AnalysisResult struct {
 }
 
 // AnalyzeContent determines the best model for a given task
-func (ca *ContentAnalyzer) AnalyzeContent(ctx context.Context, task *types.WorkflowTask) (*AnalysisResult, error) {
-	content := ca.extractContent(task)
+func (ca *ContentAnalyzer) Analyze(ctx context.Context, task *types.WorkflowTask) (*AnalysisResult, error) {
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("Task Type: %s\n", task.Type))
+
+	for key, value := range task.Payload {
+		switch v := value.(type) {
+		case string:
+			content.WriteString(fmt.Sprintf("%s: %s ", key, v))
+		default:
+			content.WriteString(fmt.Sprintf("%s: %v ", key, v))
+		}
+	}
+
+	// Add previous output if present
+	if task.PreviousOutput != "" {
+		content.WriteString(task.PreviousOutput)
+		content.WriteString(" ")
+	}
 
 	// Determine content type
-	contentType := ca.detectContentType(content)
+	contentType := ca.detectContentType(content.String())
 
 	// Determine complexity
-	complexity := ca.assessComplexity(content)
+	complexity := ca.assessComplexity(content.String())
 
 	// Route based on content type and complexity
-	result := ca.routeTask(contentType, complexity, content, task)
+	result := ca.routeTask(contentType, complexity, content.String(), task)
 
 	return result, nil
 }
@@ -58,7 +74,11 @@ func (ca *ContentAnalyzer) extractContent(task *types.WorkflowTask) string {
 
 	// Add document type if present
 	if docType, ok := task.Payload["document_type"]; ok {
-		content.WriteString(docType)
+		if s, ok := docType.(string); ok {
+			content.WriteString(s)
+		} else {
+			content.WriteString(fmt.Sprint(docType))
+		}
 		content.WriteString(" ")
 	}
 
@@ -71,7 +91,7 @@ func (ca *ContentAnalyzer) extractContent(task *types.WorkflowTask) string {
 	// Add any additional context
 	for key, value := range task.Payload {
 		if key != "document_type" {
-			content.WriteString(fmt.Sprintf("%s: %s ", key, value))
+			content.WriteString(fmt.Sprintf("%s: %v ", key, value))
 		}
 	}
 

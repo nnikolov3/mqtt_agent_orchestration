@@ -79,12 +79,21 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 
 	// Get RAG context if enabled
 	if p.ragService != nil && p.capabilities.RAGEnabled {
+		var docTypeStr string
+		if v, ok := workflowTask.Payload["document_type"]; ok {
+			if s, ok := v.(string); ok {
+				docTypeStr = s
+			} else {
+				docTypeStr = fmt.Sprint(v)
+			}
+		}
+
 		ragContext, err := p.ragService.GetRelevantContext(ctx, workflowTask.Type,
-			fmt.Sprintf("%s %s", workflowTask.Type, workflowTask.Payload["document_type"]))
+			fmt.Sprintf("%s %s", workflowTask.Type, docTypeStr))
 		if err == nil {
 			// Add RAG context to task payload for execution
 			if workflowTask.Payload == nil {
-				workflowTask.Payload = make(map[string]string)
+				workflowTask.Payload = make(map[string]interface{})
 			}
 			workflowTask.Payload["rag_context"] = ragContext
 		}
@@ -157,7 +166,14 @@ func (p *RoleBasedProcessor) processTesterTask(ctx context.Context, taskContext 
 
 // createDocument creates initial document content with optimized context
 func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	documentType := taskContext.Task.Payload["document_type"]
+	var documentType string
+	if v, ok := taskContext.Task.Payload["document_type"]; ok {
+		if s, ok := v.(string); ok {
+			documentType = s
+		} else {
+			documentType = fmt.Sprint(v)
+		}
+	}
 
 	// Try local model first if available
 	if p.modelManager != nil && taskContext.ModelAnalysis != nil {
@@ -185,7 +201,15 @@ func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *En
 // reviewDocument reviews and improves existing content with optimized context
 func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
 	// Build optimized prompt for review phase
-	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "review", taskContext.Task.Payload["document_type"])
+	var docTypeReview string
+	if v, ok := taskContext.Task.Payload["document_type"]; ok {
+		if s, ok := v.(string); ok {
+			docTypeReview = s
+		} else {
+			docTypeReview = fmt.Sprint(v)
+		}
+	}
+	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "review", docTypeReview)
 
 	// Use AI helper focused on review/analysis
 	aiHelper := p.selectAIHelper("review")
@@ -201,7 +225,15 @@ func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, taskContext *En
 // approveDocument performs final approval check with optimized context
 func (p *RoleBasedProcessor) approveDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
 	// Build optimized prompt for approval phase
-	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "approve", taskContext.Task.Payload["document_type"])
+	var docTypeApprove string
+	if v, ok := taskContext.Task.Payload["document_type"]; ok {
+		if s, ok := v.(string); ok {
+			docTypeApprove = s
+		} else {
+			docTypeApprove = fmt.Sprint(v)
+		}
+	}
+	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "approve", docTypeApprove)
 
 	// Use AI helper best for final analysis
 	aiHelper := p.selectAIHelper("approval")
@@ -219,8 +251,10 @@ func (p *RoleBasedProcessor) testDocument(ctx context.Context, taskContext *Enha
 	content := taskContext.Task.PreviousOutput
 
 	// For coding standards, test by checking examples compile/lint
-	if taskContext.Task.Payload["document_type"] == "go_coding_standards" {
-		return p.testGoCodingStandards(ctx, content)
+	if v, ok := taskContext.Task.Payload["document_type"]; ok {
+		if s, ok := v.(string); ok && s == "go_coding_standards" {
+			return p.testGoCodingStandards(ctx, content)
+		}
 	}
 
 	return "Document testing not implemented for this type", nil
@@ -278,7 +312,14 @@ func (p *RoleBasedProcessor) processWithLocalModel(ctx context.Context, taskCont
 	}
 
 	// Build optimized prompt
-	documentType := taskContext.Task.Payload["document_type"]
+	var documentType string
+	if v, ok := taskContext.Task.Payload["document_type"]; ok {
+		if s, ok := v.(string); ok {
+			documentType = s
+		} else {
+			documentType = fmt.Sprint(v)
+		}
+	}
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
 
 	// Create model input

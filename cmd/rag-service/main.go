@@ -43,6 +43,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	command := os.Args[1]
+
 	// Connect to Qdrant
 	client, err := qdrant.NewClient(&qdrant.Config{
 		Host: QdrantHost,
@@ -63,14 +65,11 @@ func main() {
 		collectionName: collectionName,
 	}
 
-	// Initialize collection
-	err = service.initializeCollection()
-	if err != nil {
-		log.Printf("Warning: Collection initialization: %v", err)
-	}
-
-	command := os.Args[1]
 	switch command {
+	case "init":
+		handleInit(service)
+	case "add-document":
+		handleAddDocument(service, os.Args[2:])
 	case "register":
 		handleRegister(service, os.Args[2:])
 	case "store-standards":
@@ -108,6 +107,73 @@ func (r *RAGService) initializeCollection() error {
 
 	// Collection might already exist - that's ok
 	return err
+}
+
+func handleInit(service *RAGService) {
+	err := service.initializeCollection()
+	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			log.Printf("Collection %s already exists", service.collectionName)
+			return
+		}
+		log.Fatalf("Failed to initialize collection: %v", err)
+	}
+	log.Printf("Collection %s initialized successfully", service.collectionName)
+}
+
+func handleAddDocument(service *RAGService, args []string) {
+	if len(args) < 2 {
+		fmt.Println("Usage: rag-service add-document --collection <name> --content <text> [--metadata <json>]")
+		os.Exit(1)
+	}
+
+	var collection, content, metadataJSON string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--collection":
+			if i+1 < len(args) {
+				collection = args[i+1]
+				i++
+			}
+		case "--content":
+			if i+1 < len(args) {
+				content = args[i+1]
+				i++
+			}
+		case "--metadata":
+			if i+1 < len(args) {
+				metadataJSON = args[i+1]
+				i++
+			}
+		}
+	}
+
+	if collection == "" || content == "" {
+		fmt.Println("Usage: rag-service add-document --collection <name> --content <text> [--metadata <json>]")
+		os.Exit(1)
+	}
+
+	var metadata map[string]string
+	if metadataJSON != "" {
+		if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
+			log.Fatalf("Invalid metadata JSON: %v", err)
+		}
+	}
+
+	doc := Document{
+		ID:       fmt.Sprintf("doc-%d", time.Now().UnixNano()),
+		Content:  content,
+		Type:     "manual",
+		Source:   "cli",
+		Metadata: metadata,
+	}
+
+	service.collectionName = collection
+	if err := service.storeDocument(doc); err != nil {
+		log.Fatalf("Failed to store document: %v", err)
+	}
+
+	fmt.Println("Document stored successfully")
 }
 
 func (r *RAGService) storeDocument(doc Document) error {
@@ -647,6 +713,8 @@ Commands:
   list-projects                              List registered projects
   export-training-data --format <format>     Export training data for LoRA fine-tuning
   version                                    Show version
+  init                                       Initialize the RAG service collections
+  add-document                               Add a document to a collection
 
 Examples:
   rag-service store-standards
@@ -654,5 +722,7 @@ Examples:
   rag-service store-project mqtt_agent_orchestration /home/niko/Dev/mqtt_agent_orchestration
   rag-service search "error handling best practices"
   rag-service context myapp development "create HTTP handler"
-  rag-service export-training-data --format llama-finetune > training.jsonl`)
+  rag-service export-training-data --format llama-finetune > training.jsonl
+  rag-service init
+  rag-service add-document --collection my_collection --content "This is a test document." --metadata '{"source":"manual"}'`)
 }
