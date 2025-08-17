@@ -23,6 +23,7 @@ const (
 type TaskRouter struct {
 	localModelManager *localmodels.Manager
 	aiConfig          *ai.AIHelperConfig
+	modeManager       *ai.ModeManager
 	mcpEnabled        bool
 }
 
@@ -31,6 +32,7 @@ func NewTaskRouter(localManager *localmodels.Manager, aiConfig *ai.AIHelperConfi
 	return &TaskRouter{
 		localModelManager: localManager,
 		aiConfig:          aiConfig,
+		modeManager:       ai.NewModeManager(aiConfig),
 		mcpEnabled:        true, // Enable MCP for local operations
 	}
 }
@@ -38,7 +40,24 @@ func NewTaskRouter(localManager *localmodels.Manager, aiConfig *ai.AIHelperConfi
 // RouteTask determines the best execution strategy for a task
 func (tr *TaskRouter) RouteTask(ctx context.Context, task *types.WorkflowTask) (*TaskExecution, error) {
 	complexity := tr.analyzeTaskComplexity(task)
+	complexityStr := tr.complexityToString(complexity)
 
+	// Use mode manager to determine routing strategy
+	mode := tr.modeManager.GetMode()
+	switch mode {
+	case ai.LOCAL_ONLY:
+		return tr.routeToLocalModel(ctx, task)
+	case ai.REMOTE_ONLY:
+		return tr.routeToExternalAPI(ctx, task, complexityStr)
+	case ai.HYBRID:
+		return tr.routeHybrid(ctx, task, complexity, complexityStr)
+	default:
+		return tr.routeHybrid(ctx, task, complexity, complexityStr)
+	}
+}
+
+// routeHybrid implements intelligent hybrid routing
+func (tr *TaskRouter) routeHybrid(ctx context.Context, task *types.WorkflowTask, complexity TaskComplexity, complexityStr string) (*TaskExecution, error) {
 	switch complexity {
 	case ComplexitySimple:
 		return tr.routeToLocalModel(ctx, task)
@@ -47,11 +66,25 @@ func (tr *TaskRouter) RouteTask(ctx context.Context, task *types.WorkflowTask) (
 		if execution, err := tr.routeToLocalModel(ctx, task); err == nil {
 			return execution, nil
 		}
-		return tr.routeToExternalAPI(ctx, task, "medium")
+		return tr.routeToExternalAPI(ctx, task, complexityStr)
 	case ComplexityHigh:
-		return tr.routeToExternalAPI(ctx, task, "high")
+		return tr.routeToExternalAPI(ctx, task, complexityStr)
 	default:
 		return tr.routeToLocalModel(ctx, task)
+	}
+}
+
+// complexityToString converts TaskComplexity to string
+func (tr *TaskRouter) complexityToString(complexity TaskComplexity) string {
+	switch complexity {
+	case ComplexitySimple:
+		return "low"
+	case ComplexityMedium:
+		return "medium"
+	case ComplexityHigh:
+		return "high"
+	default:
+		return "medium"
 	}
 }
 
@@ -131,8 +164,8 @@ func (tr *TaskRouter) routeToExternalAPI(ctx context.Context, task *types.Workfl
 		return nil, fmt.Errorf("AI configuration not available")
 	}
 
-	// Get preferred API based on complexity
-	provider, apiConfig, err := tr.aiConfig.GetPreferredAPI(complexity)
+	// Use mode manager for provider selection
+	provider, apiConfig, err := tr.modeManager.SelectProvider(ctx, complexity)
 	if err != nil {
 		return nil, fmt.Errorf("no suitable API found: %w", err)
 	}
@@ -143,7 +176,7 @@ func (tr *TaskRouter) routeToExternalAPI(ctx context.Context, task *types.Workfl
 		APIConfig:   apiConfig,
 		Task:        task,
 		MCPEnabled:  false, // External APIs don't use MCP directly
-		Reasoning:   fmt.Sprintf("Task complexity: %s, using %s API", complexity, provider),
+		Reasoning:   fmt.Sprintf("Task complexity: %s, using %s API (mode: %s)", complexity, provider, tr.modeManager.GetMode()),
 	}
 
 	return execution, nil
@@ -203,12 +236,12 @@ type TaskExecution struct {
 }
 
 // Execute runs the task according to the execution plan
-func (te *TaskExecution) Execute(ctx context.Context, localManager *localmodels.Manager, aiClient *ai.AIClient) (string, error) {
+func (te *TaskExecution) Execute(ctx context.Context, localManager *localmodels.Manager, helperManager *ai.HelperManager) (string, error) {
 	switch te.Strategy {
 	case ExecutionStrategyLocal:
 		return te.executeLocal(ctx, localManager)
 	case ExecutionStrategyAPI:
-		return te.executeAPI(ctx, aiClient)
+		return te.executeAPI(ctx, helperManager)
 	default:
 		return "", fmt.Errorf("unsupported execution strategy: %v", te.Strategy)
 	}
@@ -256,15 +289,52 @@ func (te *TaskExecution) executeLocal(ctx context.Context, localManager *localmo
 }
 
 // executeAPI executes task using external API
-func (te *TaskExecution) executeAPI(ctx context.Context, aiClient *ai.AIClient) (string, error) {
-	if aiClient == nil {
-		return "", fmt.Errorf("AI client not available")
+func (te *TaskExecution) executeAPI(ctx context.Context, helperManager *ai.HelperManager) (string, error) {
+	if helperManager == nil {
+		return "", fmt.Errorf("helper manager not available")
 	}
 
-	// For now, return a placeholder since we need to implement the full AI client
-	// This would integrate with the AI helper scripts via MQTT
-	return fmt.Sprintf("API execution not yet implemented for provider: %s, model: %s, prompt: %s",
-		te.APIProvider, te.APIConfig.Models[0], te.buildDetailedPrompt()), nil
+	// Convert provider name to helper type
+	helperType := te.providerToHelperType()
+	if helperType == "" {
+		return "", fmt.Errorf("unsupported provider: %s", te.APIProvider)
+	}
+
+	// Create helper request
+	req := ai.HelperRequest{
+		Prompt:     te.buildDetailedPrompt(),
+		HelperType: helperType,
+	}
+
+	// Execute the helper
+	response, err := helperManager.ExecuteHelper(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("helper execution failed: %w", err)
+	}
+
+	if response.Error != "" {
+		return "", fmt.Errorf("helper error: %s", response.Error)
+	}
+
+	return response.Content, nil
+}
+
+// providerToHelperType converts API provider name to helper type
+func (te *TaskExecution) providerToHelperType() ai.HelperType {
+	switch strings.ToLower(te.APIProvider) {
+	case "cerebras":
+		return ai.HelperCerebras
+	case "nvidia":
+		return ai.HelperNvidia
+	case "gemini":
+		return ai.HelperGemini
+	case "grok":
+		return ai.HelperGrok
+	case "groq":
+		return ai.HelperGroq
+	default:
+		return ""
+	}
 }
 
 // buildLocalPrompt creates a prompt optimized for local models
@@ -346,4 +416,29 @@ func (te *TaskExecution) getRequiredMCPTools() []string {
 	}
 
 	return tools
+}
+
+// SetOperationalMode changes the routing mode
+func (tr *TaskRouter) SetOperationalMode(mode ai.OperationalMode) error {
+	return tr.modeManager.SetMode(mode)
+}
+
+// GetOperationalMode returns current routing mode
+func (tr *TaskRouter) GetOperationalMode() ai.OperationalMode {
+	return tr.modeManager.GetMode()
+}
+
+// GetModeStats returns statistics about operational modes
+func (tr *TaskRouter) GetModeStats() ai.ModeStats {
+	return tr.modeManager.GetModeStats()
+}
+
+// ValidateOperationalMode checks if mode change is possible
+func (tr *TaskRouter) ValidateOperationalMode(mode ai.OperationalMode) error {
+	return tr.modeManager.ValidateMode(mode)
+}
+
+// GetProviderCapabilities returns current mode capabilities
+func (tr *TaskRouter) GetProviderCapabilities() ai.ProviderCapabilities {
+	return tr.modeManager.GetProviderCapabilities()
 }

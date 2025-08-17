@@ -19,7 +19,7 @@ type RoleBasedProcessor struct {
 	ragService      *rag.Service
 	modelManager    *localmodels.Manager
 	contentAnalyzer *ContentAnalyzer
-	aiClient        *ai.AIClient
+	helperManager   *ai.HelperManager
 	taskRouter      *TaskRouter
 }
 
@@ -27,6 +27,7 @@ type RoleBasedProcessor struct {
 func NewRoleBasedProcessor(role types.WorkerRole, ragService *rag.Service, modelManager *localmodels.Manager, contentAnalyzer *ContentAnalyzer, aiConfig *ai.AIHelperConfig) *RoleBasedProcessor {
 	capabilities := GetCapabilitiesForRole(role)
 	taskRouter := NewTaskRouter(modelManager, aiConfig)
+	helperManager := ai.NewHelperManager()
 
 	return &RoleBasedProcessor{
 		role:            role,
@@ -34,6 +35,7 @@ func NewRoleBasedProcessor(role types.WorkerRole, ragService *rag.Service, model
 		ragService:      ragService,
 		modelManager:    modelManager,
 		contentAnalyzer: contentAnalyzer,
+		helperManager:   helperManager,
 		taskRouter:      taskRouter,
 	}
 }
@@ -89,7 +91,7 @@ func (p *RoleBasedProcessor) ProcessWorkflowTask(ctx context.Context, workflowTa
 	}
 
 	// Execute using the determined strategy
-	result, err := execution.Execute(ctx, p.modelManager, p.aiClient)
+	result, err := execution.Execute(ctx, p.modelManager, p.helperManager)
 	if err != nil {
 		return "", fmt.Errorf("task execution failed: %w", err)
 	}
