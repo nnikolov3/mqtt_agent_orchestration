@@ -169,13 +169,13 @@ import (
     "github.com/eclipse/paho.mqtt.golang"
     "github.com/qdrant/go-client/qdrant"
 
-    "github.com/niko/mqtt-agent-orchestration/internal/rag"
-    "github.com/niko/mqtt-agent-orchestration/pkg/types"
+    "github.com/nnikolov3/mqtt-agent-orchestration/internal/rag"
+    "github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // BAD: Disorganized imports
 import (
-    "github.com/niko/mqtt-agent-orchestration/pkg/types"
+    "github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
     "fmt"
     "github.com/eclipse/paho.mqtt.golang"
     "context"

@@ -55,7 +55,7 @@ Following our **"Excellence through Rigor"** philosophy, all scripts are:
 export BUILD_VERSION="$(git describe --tags --always --dirty)"
 export BUILD_TIME="$(date -u '+%Y-%m-%d_%H:%M:%S')"
 export BUILD_COMMIT="$(git rev-parse HEAD)"
-export GO_VERSION="1.24"
+export GO_VERSION="1.22"
 ```
 
 #### `run.sh` - System Execution Script

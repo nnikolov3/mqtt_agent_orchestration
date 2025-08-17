@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/localmodels"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/localmodels"
 	"gopkg.in/yaml.v3"
 )
 

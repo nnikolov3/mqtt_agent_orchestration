@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/worker"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/worker"
 )
 
 var (

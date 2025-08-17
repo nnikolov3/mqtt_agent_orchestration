@@ -1,6 +1,6 @@
-module github.com/niko/mqtt-agent-orchestration
+module github.com/nnikolov3/mqtt-agent-orchestration
 
-go 1.24.6
+go 1.22.0
 
 require (
 	github.com/BurntSushi/toml v1.4.0

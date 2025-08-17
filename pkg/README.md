@@ -336,7 +336,7 @@ Packages follow semantic versioning (SemVer):
 // go.mod example
 module github.com/nnikolov3/mqtt-agent-orchestration
 
-go 1.24
+go 1.22
 
 require (
     github.com/qdrant/go-client v1.0.0
@@ -538,7 +538,7 @@ if err := task.ValidateWithDetails(); err != nil {
 
 ### Planned Features
 
-- **Generic Types**: Enhanced generic type support for Go 1.24+
+- **Generic Types**: Enhanced generic type support for Go 1.22+
 - **Streaming**: Streaming support for large data sets
 - **Metrics**: Built-in metrics collection
 - **Tracing**: Distributed tracing support

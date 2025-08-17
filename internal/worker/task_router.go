@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/ai"
-	"github.com/niko/mqtt-agent-orchestration/internal/localmodels"
-	"github.com/niko/mqtt-agent-orchestration/pkg/types"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/ai"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/localmodels"
+	"github.com/nnikolov3/mqtt-agent-orchestration/pkg/types"
 )
 
 // TaskComplexity represents the complexity level of a task

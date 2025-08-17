@@ -16,9 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/niko/mqtt-agent-orchestration/internal/config"
-	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
-	"github.com/niko/mqtt-agent-orchestration/internal/rag"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/config"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/mqtt"
+	"github.com/nnikolov3/mqtt-agent-orchestration/internal/rag"
 )
 
 // High-verbosity, explicit, defensive CLI that replaces Bash scripts with parallel Go operations
