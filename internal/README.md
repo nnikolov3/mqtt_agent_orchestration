@@ -32,7 +32,7 @@ Following our **"Do more with less"** principle, the internal system is:
 
 **Configuration**:
 ```yaml
-# Uses ~/.claude/claude_helpers.toml for API configuration
+# Uses configs/ai_helpers.toml for API configuration
 # Automatic provider selection based on task requirements
 ```
 
@@ -272,7 +272,7 @@ export PROJECT_ROOT="$(pwd)"
 export QDRANT_STORAGE_PATH="/data/qdrant"
 export RAG_DATA_PATH="/data/rag"
 
-# API configuration (from ~/.claude/claude_helpers.toml)
+# API configuration (from configs/ai_helpers.toml)
 export CEREBRAS_API_KEY="your-key"
 export NVIDIA_API_KEY="your-key"
 export GEMINI_API_KEY="your-key"
@@ -284,7 +284,7 @@ export GROQ_API_KEY="your-key"
 
 - **`configs/models.yaml`**: Local model configuration
 - **`configs/mcp.yaml`**: MCP service configuration
-- **`~/.claude/claude_helpers.toml`**: External AI service configuration
+- **`configs/ai_helpers.toml`**: External AI service configuration
 
 ## Troubleshooting
 

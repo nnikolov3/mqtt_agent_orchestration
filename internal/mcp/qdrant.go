@@ -2,9 +2,12 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/niko/mqtt-agent-orchestration/pkg/types"
 )
 
 // QdrantMCPClient represents a Qdrant MCP client
@@ -57,8 +60,17 @@ func (q *QdrantMCPClient) ListCollections(ctx context.Context) ([]string, error)
 	}
 
 	// Parse collection names from result
+	var ragResponse types.RAGResponse
+	if err := json.Unmarshal([]byte(result.Content), &ragResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal RAG response: %w", err)
+	}
+
 	var collections []string
-	// For now, return empty list - in production, parse the result content
+	for _, doc := range ragResponse.Documents {
+		if collectionName, ok := doc.Metadata["collection_name"]; ok {
+			collections = append(collections, collectionName)
+		}
+	}
 	return collections, nil
 }
 
@@ -135,8 +147,26 @@ func (q *QdrantMCPClient) SearchPoints(ctx context.Context, collectionName strin
 	}
 
 	// Parse search results from response
+	var ragResponse types.RAGResponse
+	if err := json.Unmarshal([]byte(result.Content), &ragResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal RAG response: %w", err)
+	}
+
 	var searchResults []SearchResult
-	// For now, return empty list - in production, parse the result content
+	for _, doc := range ragResponse.Documents {
+		// Convert metadata to map[string]interface{}
+		payload := make(map[string]interface{}, len(doc.Metadata))
+		for k, v := range doc.Metadata {
+			payload[k] = v
+		}
+
+		searchResults = append(searchResults, SearchResult{
+			ID:      doc.ID,
+			Score:   float32(doc.Score),
+			Payload: payload,
+			Content: doc.Content,
+		})
+	}
 	return searchResults, nil
 }
 
@@ -186,12 +216,21 @@ func (q *QdrantMCPClient) GetCollectionInfo(ctx context.Context, name string) (*
 	}
 
 	// Parse collection info from response
-	info := &CollectionInfo{
-		Name: name,
-		// Other fields would be parsed from structured response
+	var ragResponse types.RAGResponse
+	if err := json.Unmarshal([]byte(result.Content), &ragResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal RAG response: %w", err)
 	}
 
-	return info, nil
+	if len(ragResponse.Documents) == 0 {
+		return nil, fmt.Errorf("no collection info found for collection: %s", name)
+	}
+
+	var info CollectionInfo
+	if err := json.Unmarshal([]byte(ragResponse.Documents[0].Content), &info); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal collection info: %w", err)
+	}
+
+	return &info, nil
 }
 
 // Point represents a point to be upserted into Qdrant

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Agent Orchestration Dashboard</title>
+    <link rel="stylesheet" href="static/css/styles.css">
+    <link rel="stylesheet" href="static/css/animations.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Main Navigation -->
+    <nav class="main-nav">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-network-wired"></i>
+                <span>MQTT Agent Orchestration</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#dashboard" class="nav-link active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                <li><a href="#workflows" class="nav-link" data-section="workflows"><i class="fas fa-project-diagram"></i> Workflows</a></li>
+                <li><a href="#workers" class="nav-link" data-section="workers"><i class="fas fa-users-cog"></i> Workers</a></li>
+                <li><a href="#rag" class="nav-link" data-section="rag"><i class="fas fa-brain"></i> RAG Service</a></li>
+                <li><a href="#models" class="nav-link" data-section="models"><i class="fas fa-microchip"></i> Models</a></li>
+                <li><a href="#config" class="nav-link" data-section="config"><i class="fas fa-cog"></i> Configuration</a></li>
+                <li><a href="#logs" class="nav-link" data-section="logs"><i class="fas fa-scroll"></i> Logs</a></li>
+            </ul>
+            <div class="nav-status">
+                <div class="status-indicator" id="mqtt-status">
+                    <i class="fas fa-circle"></i>
+                    <span>MQTT</span>
+                </div>
+                <div class="status-indicator" id="system-status">
+                    <i class="fas fa-circle"></i>
+                    <span>System</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="content-section active">
+            <div class="section-header">
+                <h1><i class="fas fa-tachometer-alt"></i> System Dashboard</h1>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="refresh-dashboard">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- System Metrics -->
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>Active Workflows</h3>
+                        <div class="metric-value" id="active-workflows">0</div>
+                        <div class="metric-trend">
+                            <i class="fas fa-arrow-up"></i> 12% from last hour
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>Active Workers</h3>
+                        <div class="metric-value" id="active-workers">0</div>
+                        <div class="metric-breakdown">
+                            <span class="worker-type">Dev: <span id="dev-workers">0</span></span>
+                            <span class="worker-type">Review: <span id="review-workers">0</span></span>
+                            <span class="worker-type">Test: <span id="test-workers">0</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>RAG Documents</h3>
+                        <div class="metric-value" id="rag-documents">0</div>
+                        <div class="metric-trend">
+                            <i class="fas fa-database"></i> Vector storage active
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>Success Rate</h3>
+                        <div class="metric-value" id="success-rate">0%</div>
+                        <div class="metric-chart" id="success-chart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Activity -->
+            <div class="dashboard-section">
+                <h2><i class="fas fa-chart-line"></i> System Activity</h2>
+                <div class="activity-container">
+                    <canvas id="activity-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Tasks -->
+            <div class="dashboard-section">
+                <h2><i class="fas fa-history"></i> Recent Tasks</h2>
+                <div class="task-list" id="recent-tasks">
+                    <!-- Tasks will be dynamically loaded -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Workflows Section -->
+        <section id="workflows" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-project-diagram"></i> Workflow Management</h1>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="create-workflow">
+                        <i class="fas fa-plus"></i> Create Workflow
+                    </button>
+                </div>
+            </div>
+
+            <div class="workflow-container">
+                <div class="workflow-filters">
+                    <input type="text" class="form-control" placeholder="Search workflows..." id="workflow-search">
+                    <select class="form-control" id="workflow-status-filter">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <select class="form-control" id="workflow-role-filter">
+                        <option value="">All Roles</option>
+                        <option value="developer">Developer</option>
+                        <option value="reviewer">Reviewer</option>
+                        <option value="approver">Approver</option>
+                        <option value="tester">Tester</option>
+                    </select>
+                </div>
+
+                <div class="workflow-list" id="workflow-list">
+                    <!-- Workflows will be dynamically loaded -->
+                </div>
+            </div>
+
+            <!-- Workflow Visualization -->
+            <div class="workflow-visualization">
+                <h2><i class="fas fa-sitemap"></i> Workflow Visualization</h2>
+                <div id="workflow-diagram"></div>
+            </div>
+        </section>
+
+        <!-- Workers Section -->
+        <section id="workers" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-users-cog"></i> Worker Management</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="scale-workers">
+                        <i class="fas fa-expand-arrows-alt"></i> Scale Workers
+                    </button>
+                </div>
+            </div>
+
+            <div class="workers-grid" id="workers-grid">
+                <!-- Worker cards will be dynamically loaded -->
+            </div>
+
+            <!-- Worker Performance -->
+            <div class="worker-performance">
+                <h2><i class="fas fa-chart-bar"></i> Worker Performance Metrics</h2>
+                <div class="performance-charts">
+                    <canvas id="worker-throughput-chart"></canvas>
+                    <canvas id="worker-latency-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- RAG Service Section -->
+        <section id="rag" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-brain"></i> RAG Service</h1>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="upload-document">
+                        <i class="fas fa-upload"></i> Upload Document
+                    </button>
+                    <button class="btn btn-secondary" id="train-embeddings">
+                        <i class="fas fa-graduation-cap"></i> Train Embeddings
+                    </button>
+                </div>
+            </div>
+
+            <!-- Document Search -->
+            <div class="rag-search">
+                <h2><i class="fas fa-search"></i> Semantic Search</h2>
+                <div class="search-container">
+                    <input type="text" class="form-control large" placeholder="Search knowledge base..." id="rag-search-input">
+                    <button class="btn btn-primary" id="rag-search-btn">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+                <div class="search-results" id="rag-search-results">
+                    <!-- Search results will be displayed here -->
+                </div>
+            </div>
+
+            <!-- Collection Management -->
+            <div class="rag-collections">
+                <h2><i class="fas fa-folder-open"></i> Collections</h2>
+                <div class="collections-grid" id="collections-grid">
+                    <!-- Collections will be dynamically loaded -->
+                </div>
+            </div>
+
+            <!-- Vector Visualization -->
+            <div class="vector-visualization">
+                <h2><i class="fas fa-vector-square"></i> Embedding Visualization</h2>
+                <div id="embedding-viz"></div>
+            </div>
+        </section>
+
+        <!-- Models Section -->
+        <section id="models" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-microchip"></i> Model Management</h1>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="download-model">
+                        <i class="fas fa-download"></i> Download Model
+                    </button>
+                </div>
+            </div>
+
+            <!-- Local Models -->
+            <div class="models-section">
+                <h2><i class="fas fa-hdd"></i> Local Models (GGUF)</h2>
+                <div class="models-grid" id="local-models-grid">
+                    <!-- Local models will be dynamically loaded -->
+                </div>
+            </div>
+
+            <!-- External AI Services -->
+            <div class="models-section">
+                <h2><i class="fas fa-cloud"></i> External AI Services</h2>
+                <div class="services-grid" id="ai-services-grid">
+                    <!-- AI services will be dynamically loaded -->
+                </div>
+            </div>
+
+            <!-- Model Performance -->
+            <div class="model-performance">
+                <h2><i class="fas fa-tachometer-alt"></i> Model Performance Comparison</h2>
+                <canvas id="model-performance-chart"></canvas>
+            </div>
+        </section>
+
+        <!-- Configuration Section -->
+        <section id="config" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-cog"></i> System Configuration</h1>
+                <div class="header-actions">
+                    <button class="btn btn-success" id="save-config">
+                        <i class="fas fa-save"></i> Save Configuration
+                    </button>
+                </div>
+            </div>
+
+            <div class="config-tabs">
+                <button class="tab-btn active" data-tab="mqtt-config">MQTT Settings</button>
+                <button class="tab-btn" data-tab="ai-config">AI Services</button>
+                <button class="tab-btn" data-tab="rag-config">RAG Settings</button>
+                <button class="tab-btn" data-tab="worker-config">Worker Settings</button>
+                <button class="tab-btn" data-tab="system-config">System Settings</button>
+            </div>
+
+            <div class="config-content">
+                <!-- MQTT Configuration -->
+                <div class="config-tab active" id="mqtt-config">
+                    <h3>MQTT Broker Settings</h3>
+                    <form class="config-form">
+                        <div class="form-group">
+                            <label>Broker Host</label>
+                            <input type="text" class="form-control" id="mqtt-host" value="localhost">
+                        </div>
+                        <div class="form-group">
+                            <label>Broker Port</label>
+                            <input type="number" class="form-control" id="mqtt-port" value="1883">
+                        </div>
+                        <div class="form-group">
+                            <label>Username (optional)</label>
+                            <input type="text" class="form-control" id="mqtt-username">
+                        </div>
+                        <div class="form-group">
+                            <label>Password (optional)</label>
+                            <input type="password" class="form-control" id="mqtt-password">
+                        </div>
+                        <div class="form-group">
+                            <label>Client ID Prefix</label>
+                            <input type="text" class="form-control" id="mqtt-client-prefix" value="mqtt-agent-">
+                        </div>
+                    </form>
+                </div>
+
+                <!-- AI Configuration -->
+                <div class="config-tab" id="ai-config">
+                    <h3>AI Service Configuration</h3>
+                    <div id="ai-services-config">
+                        <!-- AI service configurations will be dynamically loaded -->
+                    </div>
+                </div>
+
+                <!-- RAG Configuration -->
+                <div class="config-tab" id="rag-config">
+                    <h3>RAG Service Settings</h3>
+                    <form class="config-form">
+                        <div class="form-group">
+                            <label>Qdrant Host</label>
+                            <input type="text" class="form-control" id="qdrant-host" value="localhost">
+                        </div>
+                        <div class="form-group">
+                            <label>Qdrant Port</label>
+                            <input type="number" class="form-control" id="qdrant-port" value="6333">
+                        </div>
+                        <div class="form-group">
+                            <label>Embedding Model</label>
+                            <select class="form-control" id="embedding-model">
+                                <option value="qwen3-embedding-4b">Qwen3-Embedding-4B (2560d)</option>
+                                <option value="bge-large">BGE-Large</option>
+                                <option value="all-minilm">All-MiniLM</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Collection Name</label>
+                            <input type="text" class="form-control" id="collection-name" value="mqtt_agent_orchestration">
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Worker Configuration -->
+                <div class="config-tab" id="worker-config">
+                    <h3>Worker Role Configuration</h3>
+                    <div class="worker-roles-config">
+                        <!-- Worker role configurations will be dynamically loaded -->
+                    </div>
+                </div>
+
+                <!-- System Configuration -->
+                <div class="config-tab" id="system-config">
+                    <h3>System Settings</h3>
+                    <form class="config-form">
+                        <div class="form-group">
+                            <label>Log Level</label>
+                            <select class="form-control" id="log-level">
+                                <option value="debug">Debug</option>
+                                <option value="info" selected>Info</option>
+                                <option value="warn">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Max Concurrent Tasks</label>
+                            <input type="number" class="form-control" id="max-concurrent" value="10">
+                        </div>
+                        <div class="form-group">
+                            <label>Task Timeout (seconds)</label>
+                            <input type="number" class="form-control" id="task-timeout" value="300">
+                        </div>
+                        <div class="form-group">
+                            <label>Health Check Interval (seconds)</label>
+                            <input type="number" class="form-control" id="health-interval" value="30">
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Logs Section -->
+        <section id="logs" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-scroll"></i> System Logs</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="clear-logs">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                    <button class="btn btn-primary" id="export-logs">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+            </div>
+
+            <div class="log-filters">
+                <select class="form-control" id="log-level-filter">
+                    <option value="">All Levels</option>
+                    <option value="debug">Debug</option>
+                    <option value="info">Info</option>
+                    <option value="warn">Warning</option>
+                    <option value="error">Error</option>
+                </select>
+                <select class="form-control" id="log-source-filter">
+                    <option value="">All Sources</option>
+                    <option value="orchestrator">Orchestrator</option>
+                    <option value="worker">Worker</option>
+                    <option value="rag">RAG Service</option>
+                    <option value="mqtt">MQTT</option>
+                </select>
+                <input type="text" class="form-control" placeholder="Search logs..." id="log-search">
+            </div>
+
+            <div class="log-viewer" id="log-viewer">
+                <!-- Logs will be displayed here -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <!-- Create Workflow Modal -->
+    <div class="modal" id="create-workflow-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Workflow</h2>
+                <button class="modal-close" data-modal="create-workflow-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-workflow-form">
+                    <div class="form-group">
+                        <label>Workflow Name</label>
+                        <input type="text" class="form-control" id="workflow-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" id="workflow-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Role</label>
+                        <select class="form-control" id="workflow-initial-role" required>
+                            <option value="developer">Developer</option>
+                            <option value="reviewer">Reviewer</option>
+                            <option value="approver">Approver</option>
+                            <option value="tester">Tester</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Task Content</label>
+                        <textarea class="form-control" id="workflow-content" rows="5" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select class="form-control" id="workflow-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="create-workflow-modal">Cancel</button>
+                <button class="btn btn-primary" id="submit-workflow">Create Workflow</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Document Modal -->
+    <div class="modal" id="upload-document-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Upload Document to RAG</h2>
+                <button class="modal-close" data-modal="upload-document-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="upload-document-form">
+                    <div class="form-group">
+                        <label>Document Title</label>
+                        <input type="text" class="form-control" id="doc-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Collection</label>
+                        <select class="form-control" id="doc-collection" required>
+                            <option value="mqtt_agent_orchestration">MQTT Agent Orchestration</option>
+                            <option value="book_expert">Book Expert</option>
+                            <option value="custom">Custom Collection</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Document Type</label>
+                        <select class="form-control" id="doc-type">
+                            <option value="text">Text</option>
+                            <option value="code">Code</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Content</label>
+                        <textarea class="form-control" id="doc-content" rows="10" placeholder="Paste document content or drag & drop file"></textarea>
+                    </div>
+                    <div class="file-upload-area" id="file-upload-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag & drop file here or click to browse</p>
+                        <input type="file" id="doc-file" hidden>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="upload-document-modal">Cancel</button>
+                <button class="btn btn-primary" id="submit-document">Upload Document</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Load Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <script src="static/js/config.js"></script>
+    <script src="static/js/api.js"></script>
+    <script src="static/js/mqtt-client.js"></script>
+    <script src="static/js/dashboard.js"></script>
+    <script src="static/js/workflows.js"></script>
+    <script src="static/js/workers.js"></script>
+    <script src="static/js/rag.js"></script>
+    <script src="static/js/models.js"></script>
+    <script src="static/js/logs.js"></script>
+    <script src="static/js/app.js"></script>
+</body>
+</html>

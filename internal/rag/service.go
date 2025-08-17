@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/niko/mqtt-agent-orchestration/internal/mqtt"
+	"github.com/niko/mqtt-agent-orchestration/internal/rl"
 	"github.com/niko/mqtt-agent-orchestration/pkg/types"
 	"github.com/qdrant/go-client/qdrant"
 )
@@ -103,9 +104,10 @@ func (s *Service) InitializeCollections(ctx context.Context) error {
 	return nil
 }
 
-// StoreSystemPrompt stores a system prompt for a worker role
+// Updated StoreSystemPrompt with RL feedback
 func (s *Service) StoreSystemPrompt(ctx context.Context, role types.WorkerRole, prompt string) error {
-	// Generate proper embeddings using Qwen3-Embedding-4B model
+	start := time.Now()
+
 	embedding := s.generateLocalEmbedding(prompt)
 	if embedding == nil {
 		return fmt.Errorf("failed to generate embeddings for prompt - embedding model unavailable")
@@ -128,8 +130,62 @@ func (s *Service) StoreSystemPrompt(ctx context.Context, role types.WorkerRole, 
 		Points:         []*qdrant.PointStruct{point},
 	})
 
+	duration := time.Since(start)
+
+	collector := rl.NewFeedbackCollector()
+
+	taskContext := rl.TaskContext{
+		OriginalPrompt: prompt,
+		TaskType:       "store_system_prompt",
+		Complexity:     "low",
+		Mode:           "LOCAL",
+	}
+
+	metrics := rl.ExecutionMetrics{
+		Duration:    duration,
+		SuccessRate: 0.0, // Will be set based on success
+		ErrorCount:  0,
+	}
+
+	taskID := fmt.Sprintf("rag-store-%s-%d", role, time.Now().UnixNano())
+	workerID := "rag-service"
+	provider := "local"
+	model := "qdrant"
+
 	if err != nil {
+		metrics.SuccessRate = 0.0
+		metrics.ErrorCount = 1
+		taskContext.Response = fmt.Sprintf("Failed: %v", err)
+
+		fbErr := collector.CollectFailureFeedback(
+			taskID,
+			workerID,
+			provider,
+			model,
+			taskContext,
+			err.Error(),
+			metrics,
+		)
+		if fbErr != nil {
+			log.Printf("Warning: Failed to collect failure feedback: %v", fbErr)
+		}
 		return fmt.Errorf("failed to store system prompt: %w", err)
+	}
+
+	metrics.SuccessRate = 1.0
+	metrics.ErrorCount = 0
+	taskContext.Response = "Stored successfully"
+
+	fbErr := collector.CollectSuccessFeedback(
+		taskID,
+		workerID,
+		provider,
+		model,
+		taskContext,
+		metrics,
+	)
+	if fbErr != nil {
+		log.Printf("Warning: Failed to collect success feedback: %v", fbErr)
 	}
 
 	log.Printf("Stored system prompt for role: %s", role)

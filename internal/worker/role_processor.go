@@ -399,13 +399,13 @@ func (p *RoleBasedProcessor) testGoCodingStandards(ctx context.Context, content 
 	return "PASSED: Document structure validates successfully", nil
 }
 
-// GetCapabilitiesForRole returns capabilities for each role (exported)
+// GetCapabilitiesForRole returns capabilities based on worker role with model assignments
 func GetCapabilitiesForRole(role types.WorkerRole) types.WorkerCapabilities {
 	switch role {
 	case types.RoleDeveloper:
 		return types.WorkerCapabilities{
 			Roles:          []types.WorkerRole{types.RoleDeveloper},
-			AIHelpers:      []string{"gemini_code_analyzer", "cerebras_code_analyzer"},
+			AIHelpers:      []string{"grok-4"},
 			Languages:      []string{"go", "python", "bash"},
 			Specialization: "content_creation",
 			RAGEnabled:     true,
@@ -413,7 +413,7 @@ func GetCapabilitiesForRole(role types.WorkerRole) types.WorkerCapabilities {
 	case types.RoleReviewer:
 		return types.WorkerCapabilities{
 			Roles:          []types.WorkerRole{types.RoleReviewer},
-			AIHelpers:      []string{"cerebras_code_analyzer", "groq_fast_analyzer"},
+			AIHelpers:      []string{"grok-3"},
 			Languages:      []string{"go", "python", "bash"},
 			Specialization: "content_review",
 			RAGEnabled:     true,
@@ -421,7 +421,7 @@ func GetCapabilitiesForRole(role types.WorkerRole) types.WorkerCapabilities {
 	case types.RoleApprover:
 		return types.WorkerCapabilities{
 			Roles:          []types.WorkerRole{types.RoleApprover},
-			AIHelpers:      []string{"groq_fast_analyzer", "gemini_code_analyzer"},
+			AIHelpers:      []string{"gemini-pro-2.5"},
 			Languages:      []string{"go", "python", "bash"},
 			Specialization: "final_approval",
 			RAGEnabled:     true,
@@ -429,10 +429,190 @@ func GetCapabilitiesForRole(role types.WorkerRole) types.WorkerCapabilities {
 	case types.RoleTester:
 		return types.WorkerCapabilities{
 			Roles:          []types.WorkerRole{types.RoleTester},
-			AIHelpers:      []string{"cerebras_code_analyzer"},
+			AIHelpers:      []string{"gemini-flash"},
 			Languages:      []string{"go", "python", "bash"},
 			Specialization: "validation",
 			RAGEnabled:     false,
+		}
+
+	// Cerebras model roles
+	case types.RoleCerebrasGptOss120b:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleCerebrasGptOss120b},
+			AIHelpers:      []string{"gpt-oss-120b"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "complex_reasoning",
+			RAGEnabled:     true,
+		}
+	case types.RoleCerebrasQwen3Coder480b:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleCerebrasQwen3Coder480b},
+			AIHelpers:      []string{"qwen-3-coder-480b"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "code_analysis",
+			RAGEnabled:     true,
+		}
+	case types.RoleCerebrasQwen332b:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleCerebrasQwen332b},
+			AIHelpers:      []string{"qwen-3-32b"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "code_generation",
+			RAGEnabled:     true,
+		}
+	case types.RoleCerebrasLlama3370b:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleCerebrasLlama3370b},
+			AIHelpers:      []string{"llama-3.3-70b"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "general_analysis",
+			RAGEnabled:     true,
+		}
+
+	// NVIDIA model roles
+	case types.RoleNvidiaLlama33NemotronSuper49bV15:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleNvidiaLlama33NemotronSuper49bV15},
+			AIHelpers:      []string{"nvidia/llama-3.3-nemotron-super-49b-v1.5"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "complex_analysis",
+			RAGEnabled:     true,
+		}
+	case types.RoleNvidiaOpenaiGptOss120b:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleNvidiaOpenaiGptOss120b},
+			AIHelpers:      []string{"openai/gpt-oss-120b"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "text_generation",
+			RAGEnabled:     true,
+		}
+	case types.RoleNvidiaNemotron4340bInstruct:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleNvidiaNemotron4340bInstruct},
+			AIHelpers:      []string{"nvidia/nemotron-4-340b-instruct"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "reasoning",
+			RAGEnabled:     true,
+		}
+	case types.RoleNvidiaMetaLlama318bInstruct:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleNvidiaMetaLlama318bInstruct},
+			AIHelpers:      []string{"meta/llama-3.1-8b-instruct"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "instruction_following",
+			RAGEnabled:     true,
+		}
+
+	// NVIDIA OCR role
+	case types.RoleNvidiaNemoretrieverOcrV1:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleNvidiaNemoretrieverOcrV1},
+			AIHelpers:      []string{"nvidia/nemoretriever-ocr-v1"},
+			Languages:      []string{},
+			Specialization: "ocr_extraction",
+			RAGEnabled:     false,
+		}
+
+	// Gemini model roles
+	case types.RoleGemini25Pro:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGemini25Pro},
+			AIHelpers:      []string{"gemini-2.5-pro"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "multimodal_analysis",
+			RAGEnabled:     true,
+		}
+	case types.RoleGemini25Flash:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGemini25Flash},
+			AIHelpers:      []string{"gemini-2.5-flash"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "quick_analysis",
+			RAGEnabled:     true,
+		}
+	case types.RoleGemini20Flash:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGemini20Flash},
+			AIHelpers:      []string{"gemini-2.0-flash"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "fast_reasoning",
+			RAGEnabled:     true,
+		}
+	case types.RoleGemini15Flash:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGemini15Flash},
+			AIHelpers:      []string{"gemini-1.5-flash"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "light_analysis",
+			RAGEnabled:     true,
+		}
+
+	// Grok model roles
+	case types.RoleGrok40709:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGrok40709},
+			AIHelpers:      []string{"grok-4-0709"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "creative_multimodal",
+			RAGEnabled:     true,
+		}
+	case types.RoleGrok3:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGrok3},
+			AIHelpers:      []string{"grok-3"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "analysis",
+			RAGEnabled:     true,
+		}
+	case types.RoleGrok3Mini:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGrok3Mini},
+			AIHelpers:      []string{"grok-3-mini"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "quick_tasks",
+			RAGEnabled:     true,
+		}
+
+	// Groq model roles
+	case types.RoleGroqMoonshotaiKimiK2Instruct:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGroqMoonshotaiKimiK2Instruct},
+			AIHelpers:      []string{"moonshotai/kimi-k2-instruct"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "enhanced_analysis",
+			RAGEnabled:     true,
+		}
+	case types.RoleGroqLlama3370bVersatile:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGroqLlama3370bVersatile},
+			AIHelpers:      []string{"llama-3.3-70b-versatile"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "versatile_tasks",
+			RAGEnabled:     true,
+		}
+	case types.RoleGroqDeepseekR1DistillLlama70b:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGroqDeepseekR1DistillLlama70b},
+			AIHelpers:      []string{"deepseek-r1-distill-llama-70b"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "distilled_analysis",
+			RAGEnabled:     true,
+		}
+	case types.RoleGroqLlama370b8192:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGroqLlama370b8192},
+			AIHelpers:      []string{"llama3-70b-8192"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "large_context",
+			RAGEnabled:     true,
+		}
+	case types.RoleGroqLlama318bInstant:
+		return types.WorkerCapabilities{
+			Roles:          []types.WorkerRole{types.RoleGroqLlama318bInstant},
+			AIHelpers:      []string{"llama-3.1-8b-instant"},
+			Languages:      []string{"go", "python", "bash"},
+			Specialization: "fast_inference",
+			RAGEnabled:     true,
 		}
 	default:
 		return types.WorkerCapabilities{}

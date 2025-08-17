@@ -87,7 +87,7 @@ fallback:
   max_retries: 3
   retry_delay: "5s"
   
-  # API configurations (from claude_helpers.toml)
+  # API configurations (from configs/ai_helpers.toml)
   cerebras:
     models: ["gpt-oss-120b", "qwen-3-coder-480b", "qwen-3-32b", "llama-3.3-70b"]
     description: "Fast code analysis, review, and generation"

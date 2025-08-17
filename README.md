@@ -40,7 +40,7 @@ Autonomous AI agent orchestration implementing role-based workflow coordination.
 ### Optional Components
 - **Local Models**: llama.cpp binaries (`llama-server`, `llama-embedding`) for GGUF model inference
 - **GPU Acceleration**: NVIDIA GPU with CUDA support for enhanced performance
-- **External AI Services**: API keys for Cerebras, NVIDIA, Gemini, Grok, Groq (configured via `~/.claude/claude_helpers.toml`)
+- **External AI Services**: API keys for Cerebras, NVIDIA, Gemini, Grok, Groq (configured via `configs/ai_helpers.toml`)
 
 ### Configuration Philosophy
 Following **"Never hard code values"** principle:
@@ -358,7 +358,7 @@ Following **"Explicit configuration"** and **"Single source of truth"** principl
 
 - **`configs/models.yaml`**: Local GGUF model configuration and GPU memory management
 - **`configs/mcp.yaml`**: Model Context Protocol service definitions
-- **`~/.claude/claude_helpers.toml`**: External AI service API keys and routing
+- **`configs/ai_helpers.toml`**: External AI service API keys and routing
 
 ## Diagnostics and Troubleshooting
 

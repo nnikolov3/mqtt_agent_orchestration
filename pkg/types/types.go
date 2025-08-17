@@ -18,6 +18,7 @@ type Workflow struct {
 	CreatedAt    time.Time              `json:"created_at"`
 	Tasks        []*WorkflowTask        `json:"tasks"`
 	CurrentStage WorkflowStage          `json:"current_stage"`
+	Status       WorkflowStatus         `json:"status"`
 }
 
 // Task represents a single task for a worker
@@ -64,12 +65,13 @@ type WorkflowTask struct {
 // WorkflowResult represents the result of a workflow task
 type WorkflowResult struct {
 	TaskResult
-	WorkflowID     string        `json:"workflow_id"`
-	Stage          WorkflowStage `json:"stage"`
-	WorkerRole     WorkerRole    `json:"worker_role"`
-	Approved       bool          `json:"approved"`
-	RequiresRetry  bool          `json:"requires_retry"`
-	ReviewFeedback string        `json:"review_feedback"`
+	WorkflowID     string         `json:"workflow_id"`
+	Stage          WorkflowStage  `json:"stage"`
+	WorkerRole     WorkerRole     `json:"worker_role"`
+	Approved       bool           `json:"approved"`
+	RequiresRetry  bool           `json:"requires_retry"`
+	ReviewFeedback string         `json:"review_feedback"`
+	Status         WorkflowStatus `json:"status"`
 }
 
 // ExtendedWorkerStatus represents the extended status of a worker
@@ -118,6 +120,7 @@ type RAGResponse struct {
 
 // RAGDocument represents a document in the RAG service
 type RAGDocument struct {
+	ID       string            `json:"id"`
 	Content  string            `json:"content"`
 	Score    float64           `json:"score"`
 	Metadata map[string]string `json:"metadata"`
@@ -130,6 +133,9 @@ type WorkerRole string
 // WorkflowStage represents the stage of a workflow
 type WorkflowStage string
 
+// WorkflowStatus represents the status of a workflow
+type WorkflowStatus string
+
 // Constants for worker roles and workflow stages
 const (
 	RoleDeveloper WorkerRole = "developer"
@@ -137,11 +143,49 @@ const (
 	RoleApprover  WorkerRole = "approver"
 	RoleTester    WorkerRole = "tester"
 
+	// Cerebras model roles
+	RoleCerebrasGptOss120b     WorkerRole = "cerebras_gpt_oss_120b"
+	RoleCerebrasQwen3Coder480b WorkerRole = "cerebras_qwen_3_coder_480b"
+	RoleCerebrasQwen332b       WorkerRole = "cerebras_qwen_3_32b"
+	RoleCerebrasLlama3370b     WorkerRole = "cerebras_llama_3.3_70b"
+
+	// NVIDIA model roles
+	RoleNvidiaLlama33NemotronSuper49bV15 WorkerRole = "nvidia_llama_3.3_nemotron_super_49b_v1.5"
+	RoleNvidiaOpenaiGptOss120b           WorkerRole = "nvidia_openai_gpt_oss_120b"
+	RoleNvidiaNemotron4340bInstruct      WorkerRole = "nvidia_nemotron_4_340b_instruct"
+	RoleNvidiaMetaLlama318bInstruct      WorkerRole = "nvidia_meta_llama_3.1_8b_instruct"
+
+	// NVIDIA OCR role
+	RoleNvidiaNemoretrieverOcrV1 WorkerRole = "nvidia_nemoretriever_ocr_v1"
+
+	// Gemini model roles
+	RoleGemini25Pro   WorkerRole = "gemini_2.5_pro"
+	RoleGemini25Flash WorkerRole = "gemini_2.5_flash"
+	RoleGemini20Flash WorkerRole = "gemini_2.0_flash"
+	RoleGemini15Flash WorkerRole = "gemini_1.5_flash"
+
+	// Grok model roles
+	RoleGrok40709 WorkerRole = "grok_4_0709"
+	RoleGrok3     WorkerRole = "grok_3"
+	RoleGrok3Mini WorkerRole = "grok_3_mini"
+
+	// Groq model roles
+	RoleGroqMoonshotaiKimiK2Instruct  WorkerRole = "groq_moonshotai_kimi_k2_instruct"
+	RoleGroqLlama3370bVersatile       WorkerRole = "groq_llama_3.3_70b_versatile"
+	RoleGroqDeepseekR1DistillLlama70b WorkerRole = "groq_deepseek_r1_distill_llama_70b"
+	RoleGroqLlama370b8192             WorkerRole = "groq_llama3_70b_8192"
+	RoleGroqLlama318bInstant          WorkerRole = "groq_llama_3.1_8b_instant"
+
 	StageDevelopment WorkflowStage = "development"
 	StageReview      WorkflowStage = "review"
 	StageApproval    WorkflowStage = "approval"
 	StageTesting     WorkflowStage = "testing"
 	StageCompleted   WorkflowStage = "completed"
+	StageFailed      WorkflowStage = "failed"
+
+	StatusInProgress WorkflowStatus = "in_progress"
+	StatusCompleted  WorkflowStatus = "completed"
+	StatusFailed     WorkflowStatus = "failed"
 
 	EmbeddingRequestTopic  = "embedding/request"
 	EmbeddingResponseTopic = "embedding/response"
