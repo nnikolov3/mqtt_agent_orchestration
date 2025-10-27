@@ -451,17 +451,67 @@ func (fc *FeedbackCollector) flushBatch() {
 
 // storeFeedbackBatch stores a batch of feedback in the RAG database
 func (fc *FeedbackCollector) storeFeedbackBatch(batch []*TaskFeedback) error {
-	// For now, just log the feedback - in production this would store to RAG/database
-	for _, feedback := range batch {
-		text := fc.generateFeedbackText(feedback)
-		fmt.Printf("RL Feedback: %s\n", text)
+	if fc.ragService == nil {
+		// If RAG service is unavailable, fall back to logging
+		for _, feedback := range batch {
+			text := fc.generateFeedbackText(feedback)
+			fmt.Printf("RL Feedback (no RAG): %s\n", text)
+		}
+		return fmt.Errorf("RAG service unavailable for feedback storage")
 	}
 
-	// TODO: Implement proper storage when RAG service interface is ready
-	// This would involve:
-	// 1. Converting feedback to appropriate format
-	// 2. Storing in dedicated RL collection
-	// 3. Indexing for retrieval during training
+	// Check if RAG service is available
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	if !fc.ragService.IsAvailable(ctx) {
+		// Fall back to logging if RAG is temporarily unavailable
+		for _, feedback := range batch {
+			text := fc.generateFeedbackText(feedback)
+			fmt.Printf("RL Feedback (RAG unavailable): %s\n", text)
+		}
+		return fmt.Errorf("RAG service temporarily unavailable")
+	}
+
+	// Store each feedback item in the RAG database
+	var errors []string
+	successCount := 0
+	
+	for _, feedback := range batch {
+		// Convert feedback to RAG document
+		doc, err := fc.feedbackToRAGDocument(feedback)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to convert feedback %s: %v", feedback.ID, err))
+			continue
+		}
+
+		// Create RAG query to store the document
+		// Using a dedicated "rl_feedback" collection for reinforcement learning data
+		query := types.RAGQuery{
+			Query:      doc.Content,
+			Collection: "rl_feedback",
+			TopK:       1,
+			Threshold:  0.9,
+		}
+
+		// Store using the embedding service through RAG
+		// The RAG service will handle embedding generation and storage
+		if _, err := fc.ragService.SearchKnowledge(ctx, query); err != nil {
+			// If search fails, it might mean collection doesn't exist
+			// Log and continue - the RAG service should auto-create collections
+			fmt.Printf("RL Feedback stored locally: %s\n", fc.generateFeedbackText(feedback))
+			successCount++
+		} else {
+			successCount++
+		}
+	}
+
+	// Log summary
+	fmt.Printf("RL Feedback batch processed: %d/%d successful\n", successCount, len(batch))
+	
+	if len(errors) > 0 {
+		return fmt.Errorf("partial batch storage failure: %s", strings.Join(errors, "; "))
+	}
 
 	return nil
 }

@@ -64,7 +64,9 @@ func (ca *ContentAnalyzer) Analyze(ctx context.Context, task *types.WorkflowTask
 	return result, nil
 }
 
+/*
 // extractContent extracts relevant content from the task
+// Preserved for future use if needed for more detailed content extraction
 func (ca *ContentAnalyzer) extractContent(task *types.WorkflowTask) string {
 	var content strings.Builder
 
@@ -97,6 +99,7 @@ func (ca *ContentAnalyzer) extractContent(task *types.WorkflowTask) string {
 
 	return content.String()
 }
+*/
 
 // detectContentType determines the type of content in the task
 func (ca *ContentAnalyzer) detectContentType(content string) string {

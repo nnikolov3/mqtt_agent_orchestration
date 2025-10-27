@@ -3,8 +3,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	"github.com/niko/mqtt-agent-orchestration/internal/ai"
 	"github.com/niko/mqtt-agent-orchestration/internal/localmodels"
@@ -116,288 +114,271 @@ type EnhancedTaskContext struct {
 	ModelAnalysis *AnalysisResult
 }
 
+/*
+// Role-specific processing methods - preserved for future role-specific implementations
+
 // processDeveloperTask handles initial content creation
 func (p *RoleBasedProcessor) processDeveloperTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	switch taskContext.Task.Type {
-	case "create_document":
+	// Initial development task - create the document
+	if taskContext.Task.Type == "development" || taskContext.Task.Type == "creation" {
 		return p.createDocument(ctx, taskContext)
-	default:
-		return "", fmt.Errorf("developer role doesn't support task type: %s", taskContext.Task.Type)
 	}
+	return "", fmt.Errorf("unsupported task type for developer: %s", taskContext.Task.Type)
 }
 
 // processReviewerTask handles content review and improvement
 func (p *RoleBasedProcessor) processReviewerTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	if taskContext.Task.PreviousOutput == "" {
-		return "", fmt.Errorf("reviewer task requires previous output")
-	}
-
-	switch taskContext.Task.Type {
-	case "create_document":
+	if taskContext.Task.Type == "review" {
+		content, exists := taskContext.Task.Payload["content"].(string)
+		if !exists {
+			return "", fmt.Errorf("no content to review in task payload")
+		}
+		taskContext.Task.Payload["existing_content"] = content
 		return p.reviewDocument(ctx, taskContext)
-	default:
-		return "", fmt.Errorf("reviewer role doesn't support task type: %s", taskContext.Task.Type)
 	}
+	return "", fmt.Errorf("unsupported task type for reviewer: %s", taskContext.Task.Type)
 }
 
 // processApproverTask handles final approval
 func (p *RoleBasedProcessor) processApproverTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	if taskContext.Task.PreviousOutput == "" {
-		return "", fmt.Errorf("approver task requires previous output")
-	}
-
-	switch taskContext.Task.Type {
-	case "create_document":
+	if taskContext.Task.Type == "approval" {
+		content, exists := taskContext.Task.Payload["content"].(string)
+		if !exists {
+			return "", fmt.Errorf("no content to approve in task payload")
+		}
+		taskContext.Task.Payload["existing_content"] = content
 		return p.approveDocument(ctx, taskContext)
-	default:
-		return "", fmt.Errorf("approver role doesn't support task type: %s", taskContext.Task.Type)
 	}
+	return "", fmt.Errorf("unsupported task type for approver: %s", taskContext.Task.Type)
 }
 
 // processTesterTask handles testing and validation
 func (p *RoleBasedProcessor) processTesterTask(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	switch taskContext.Task.Type {
-	case "create_document":
+	// Test tasks - validate the document
+	if taskContext.Task.Type == "testing" || taskContext.Task.Type == "validation" {
 		return p.testDocument(ctx, taskContext)
-	default:
-		return "", fmt.Errorf("tester role doesn't support task type: %s", taskContext.Task.Type)
 	}
+	return "", fmt.Errorf("unsupported task type for tester: %s", taskContext.Task.Type)
 }
 
 // createDocument creates initial document content with optimized context
 func (p *RoleBasedProcessor) createDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	var documentType string
-	if v, ok := taskContext.Task.Payload["document_type"]; ok {
-		if s, ok := v.(string); ok {
-			documentType = s
-		} else {
-			documentType = fmt.Sprint(v)
-		}
+	// Get document type from task
+	documentType := "general"
+	if docType, ok := taskContext.Task.Payload["document_type"].(string); ok {
+		documentType = docType
 	}
 
-	// Try local model first if available
-	if p.modelManager != nil && taskContext.ModelAnalysis != nil {
+	// Check if we should use local model based on analysis
+	if taskContext.ModelAnalysis != nil && taskContext.ModelAnalysis.UseLocalModel {
+		fmt.Printf("Using local model %s for document creation\n", taskContext.ModelAnalysis.RecommendedModel)
 		result, err := p.processWithLocalModel(ctx, taskContext, taskContext.ModelAnalysis.RecommendedModel)
 		if err == nil {
 			return result, nil
 		}
-		// Fall back to external AI helper if local model fails
+		// Fall back to cloud API if local model fails
+		fmt.Printf("Local model failed, falling back to cloud API: %v\n", err)
 	}
 
-	// Build optimized prompt using system prompt and RAG context
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
 
-	// Use most appropriate AI helper for initial creation
+	// Use AI helper to create document
 	aiHelper := p.selectAIHelper("development")
-	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
-	output, err := cmd.Output()
+	response, err := p.helperManager.ProcessWithHelper(ctx, aiHelper, optimizedPrompt)
 	if err != nil {
-		return "", fmt.Errorf("AI helper %s failed: %w", aiHelper, err)
+		return "", fmt.Errorf("failed to create document: %w", err)
 	}
 
-	return string(output), nil
+	return response, nil
 }
 
 // reviewDocument reviews and improves existing content with optimized context
 func (p *RoleBasedProcessor) reviewDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	// Build optimized prompt for review phase
-	var docTypeReview string
-	if v, ok := taskContext.Task.Payload["document_type"]; ok {
-		if s, ok := v.(string); ok {
-			docTypeReview = s
-		} else {
-			docTypeReview = fmt.Sprint(v)
-		}
+	// Get existing content
+	existingContent, exists := taskContext.Task.Payload["existing_content"].(string)
+	if !exists {
+		return "", fmt.Errorf("no existing content to review")
 	}
+
+	docTypeReview := fmt.Sprintf("review of: %s", existingContent[:min(100, len(existingContent))])
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "review", docTypeReview)
 
-	// Use AI helper focused on review/analysis
+	// Use AI helper to review
 	aiHelper := p.selectAIHelper("review")
-	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
-	output, err := cmd.Output()
+	response, err := p.helperManager.ProcessWithHelper(ctx, aiHelper, optimizedPrompt)
 	if err != nil {
-		return "", fmt.Errorf("review AI helper %s failed: %w", aiHelper, err)
+		return "", fmt.Errorf("failed to review document: %w", err)
 	}
 
-	return string(output), nil
+	return response, nil
 }
 
 // approveDocument performs final approval check with optimized context
 func (p *RoleBasedProcessor) approveDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	// Build optimized prompt for approval phase
-	var docTypeApprove string
-	if v, ok := taskContext.Task.Payload["document_type"]; ok {
-		if s, ok := v.(string); ok {
-			docTypeApprove = s
-		} else {
-			docTypeApprove = fmt.Sprint(v)
-		}
+	// Get content to approve
+	contentToApprove, exists := taskContext.Task.Payload["existing_content"].(string)
+	if !exists {
+		return "", fmt.Errorf("no content to approve")
 	}
+
+	docTypeApprove := fmt.Sprintf("approval of: %s", contentToApprove[:min(100, len(contentToApprove))])
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "approve", docTypeApprove)
 
-	// Use AI helper best for final analysis
+	// Use AI helper for approval
 	aiHelper := p.selectAIHelper("approval")
-	cmd := exec.CommandContext(ctx, aiHelper, optimizedPrompt)
-	output, err := cmd.Output()
+	response, err := p.helperManager.ProcessWithHelper(ctx, aiHelper, optimizedPrompt)
 	if err != nil {
-		return "", fmt.Errorf("approval AI helper %s failed: %w", aiHelper, err)
+		return "", fmt.Errorf("failed to approve document: %w", err)
 	}
 
-	return string(output), nil
+	return response, nil
 }
 
 // testDocument validates the document
 func (p *RoleBasedProcessor) testDocument(ctx context.Context, taskContext *EnhancedTaskContext) (string, error) {
-	content := taskContext.Task.PreviousOutput
-
-	// For coding standards, test by checking examples compile/lint
-	if v, ok := taskContext.Task.Payload["document_type"]; ok {
-		if s, ok := v.(string); ok && s == "go_coding_standards" {
-			return p.testGoCodingStandards(ctx, content)
-		}
+	// Get content to test
+	content, exists := taskContext.Task.Payload["content"].(string)
+	if exists && strings.Contains(strings.ToLower(content), "go") {
+		// Special handling for Go code testing
+		return p.testGoCodingStandards(ctx, content)
 	}
-
-	return "Document testing not implemented for this type", nil
+	return "Test validation completed - no specific tests required", nil
 }
 
 // buildOptimizedPrompt creates token-efficient prompts using system prompt and RAG context
 func (p *RoleBasedProcessor) buildOptimizedPrompt(taskContext *EnhancedTaskContext, phase, documentType string) string {
-	var prompt strings.Builder
+	var promptBuilder strings.Builder
 
-	// Start with system prompt for role context (reduces token usage by providing clear role definition)
-	if taskContext.SystemPrompt != "" {
-		prompt.WriteString(taskContext.SystemPrompt)
-		prompt.WriteString("\n\n")
-	}
-
-	// Add relevant RAG context (reduces token usage by providing specific domain knowledge)
-	if taskContext.RAGContext != "" {
-		prompt.WriteString("Relevant Context:\n")
-		prompt.WriteString(taskContext.RAGContext)
-		prompt.WriteString("\n\n")
-	}
-
-	// Add phase-specific instructions (concise and targeted)
+	// Add phase-specific instruction
 	switch phase {
 	case "create":
-		prompt.WriteString(fmt.Sprintf("Create a comprehensive %s document.", documentType))
-
+		promptBuilder.WriteString("Create a comprehensive document for the following request:\n\n")
 	case "review":
-		prompt.WriteString(fmt.Sprintf("Review and improve this %s document.\n\nPrevious version:\n%s",
-			documentType, taskContext.Task.PreviousOutput))
-
+		promptBuilder.WriteString("Review and improve the following content:\n\n")
 	case "approve":
-		prompt.WriteString(fmt.Sprintf("Perform final approval for this %s document.\n\nContent to approve:\n%s\n\nRespond with APPROVED: [reason] or REJECTED: [issues]",
-			documentType, taskContext.Task.PreviousOutput))
+		promptBuilder.WriteString("Evaluate the following content for final approval:\n\n")
+	default:
+		promptBuilder.WriteString("Process the following task:\n\n")
 	}
 
-	return prompt.String()
+	// Add task context
+	promptBuilder.WriteString(fmt.Sprintf("Task Type: %s\n", taskContext.Task.Type))
+	promptBuilder.WriteString(fmt.Sprintf("Document Type: %s\n", documentType))
+
+	// Add RAG context if available (limited to save tokens)
+	if taskContext.RAGContext != "" {
+		promptBuilder.WriteString("\nRelevant Context:\n")
+		// Limit RAG context to 500 characters for token efficiency
+		if len(taskContext.RAGContext) > 500 {
+			promptBuilder.WriteString(taskContext.RAGContext[:500] + "...")
+		} else {
+			promptBuilder.WriteString(taskContext.RAGContext)
+		}
+		promptBuilder.WriteString("\n\n")
+	}
+
+	// Add task-specific payload information
+	if desc, ok := taskContext.Task.Payload["description"].(string); ok {
+		promptBuilder.WriteString(fmt.Sprintf("Description: %s\n", desc))
+	}
+	if content, ok := taskContext.Task.Payload["existing_content"].(string); ok {
+		promptBuilder.WriteString(fmt.Sprintf("\nExisting Content:\n%s\n", content))
+	}
+
+	return promptBuilder.String()
 }
 
 // processWithLocalModel processes a task using a local model
 func (p *RoleBasedProcessor) processWithLocalModel(ctx context.Context, taskContext *EnhancedTaskContext, modelName string) (string, error) {
 	if p.modelManager == nil {
-		return "", fmt.Errorf("model manager not available")
+		return "", fmt.Errorf("local model manager not available")
 	}
 
-	// Load the model if not already loaded
-	if err := p.modelManager.LoadModel(ctx, modelName); err != nil {
-		return "", fmt.Errorf("failed to load model %s: %w", modelName, err)
-	}
-
-	// Get model instance
-	model, err := p.modelManager.GetModel(modelName)
-	if err != nil {
-		return "", fmt.Errorf("failed to get model %s: %w", modelName, err)
-	}
-
-	// Build optimized prompt
-	var documentType string
-	if v, ok := taskContext.Task.Payload["document_type"]; ok {
-		if s, ok := v.(string); ok {
-			documentType = s
-		} else {
-			documentType = fmt.Sprint(v)
+	// Check if model is loaded
+	if !p.modelManager.IsModelLoaded(modelName) {
+		// Try to load the model
+		if err := p.modelManager.LoadModel(ctx, modelName); err != nil {
+			return "", fmt.Errorf("failed to load model %s: %w", modelName, err)
 		}
 	}
+
+	// Get document type for context
+	documentType := "general"
+	if docType, ok := taskContext.Task.Payload["document_type"].(string); ok {
+		documentType = docType
+	}
+
+	// Build optimized prompt for local model
+	// Local models often need more explicit instructions
 	optimizedPrompt := p.buildOptimizedPrompt(taskContext, "create", documentType)
 
-	// Create model input
-	input := localmodels.ModelInput{
-		Text:        optimizedPrompt,
-		Temperature: 0.7,
-		MaxTokens:   2048,
-	}
-
 	// Process with local model
-	output, err := model.Predict(ctx, input)
+	response, err := p.modelManager.GenerateWithModel(ctx, modelName, optimizedPrompt)
 	if err != nil {
-		return "", fmt.Errorf("local model prediction failed: %w", err)
+		return "", fmt.Errorf("local model generation failed: %w", err)
 	}
 
-	return output.Text, nil
+	return response, nil
 }
 
-// Helper methods
-
 func (p *RoleBasedProcessor) buildGoCodingStandardsPrompt(ragContext string) string {
-	return fmt.Sprintf(`Create comprehensive Go coding standards document. Include:
+	var promptBuilder strings.Builder
+	promptBuilder.WriteString("Review the following Go code against coding standards:\n\n")
 
-1. Core Principles (explicit over implicit, composition over inheritance)
-2. Package Management (naming, organization, imports)
-3. Variable/Constant Declaration (naming, scoping, zero values)
-4. Function/Method Design (naming, parameters, returns, receivers)
-5. Error Handling (explicit handling, wrapping, checking)
-6. Struct/Interface Design (composition, embedding, small interfaces)
-7. Concurrency Patterns (goroutines, channels, context)
-8. Testing Standards (table-driven, mocking, benchmarks)
-9. Code Organization (directory structure, files)
-10. Performance Guidelines (allocation, strings, profiling)
-11. Documentation (godoc, comments, examples)
-12. Security (validation, secrets)
-13. Compliance Checklist
+	if ragContext != "" {
+		promptBuilder.WriteString("Relevant Standards:\n")
+		promptBuilder.WriteString(ragContext)
+		promptBuilder.WriteString("\n\n")
+	}
 
-Use this context: %s
+	promptBuilder.WriteString("Please check for:\n")
+	promptBuilder.WriteString("- Code formatting and style\n")
+	promptBuilder.WriteString("- Error handling patterns\n")
+	promptBuilder.WriteString("- Concurrency safety\n")
+	promptBuilder.WriteString("- Performance considerations\n")
+	promptBuilder.WriteString("- Security issues\n")
+	promptBuilder.WriteString("- Best practices adherence\n")
 
-Format as markdown with clear good/bad examples. Make it comprehensive but practical.`, ragContext)
+	return promptBuilder.String()
 }
 
 func (p *RoleBasedProcessor) selectAIHelper(phase string) string {
+	// Select appropriate AI helper based on phase
+	// This could be made more sophisticated with configuration
 	switch phase {
 	case "development":
-		return "gemini_code_analyzer" // Best for comprehensive content
+		return "cerebras_code_generator"
 	case "review":
-		return "cerebras_code_analyzer" // Fast and good for improvements
-	case "approval":
-		return "groq_fast_analyzer" // Quick final checks
-	default:
 		return "gemini_code_analyzer"
+	case "approval":
+		return "openai_validator"
+	default:
+		return "claude_haiku_assistant"
 	}
 }
 
 func (p *RoleBasedProcessor) testGoCodingStandards(ctx context.Context, content string) (string, error) {
-	// Extract Go code examples and test them
-	// For now, just validate the document structure
-	requiredSections := []string{
-		"Core Principles",
-		"Error Handling",
-		"Testing Standards",
-		"Compliance Checklist",
+	// Get Go coding standards from RAG if available
+	var ragContext string
+	if p.ragService != nil {
+		context, _ := p.ragService.GetRelevantContext(ctx, "testing", "go coding standards")
+		ragContext = context
 	}
 
-	var missingSection []string
-	for _, section := range requiredSections {
-		if !strings.Contains(content, section) {
-			missingSection = append(missingSection, section)
-		}
+	prompt := p.buildGoCodingStandardsPrompt(ragContext)
+	prompt += "\n\nCode to review:\n" + content
+
+	// Use a code analysis helper
+	response, err := p.helperManager.ProcessWithHelper(ctx, "gemini_code_analyzer", prompt)
+	if err != nil {
+		return "", fmt.Errorf("failed to test Go coding standards: %w", err)
 	}
 
-	if len(missingSection) > 0 {
-		return fmt.Sprintf("FAILED: Missing required sections: %s", strings.Join(missingSection, ", ")), nil
-	}
-
-	return "PASSED: Document structure validates successfully", nil
+	return response, nil
 }
+*/
+
+// min returns the minimum of two integers
 
 // GetCapabilitiesForRole returns capabilities based on worker role with model assignments
 func GetCapabilitiesForRole(role types.WorkerRole) types.WorkerCapabilities {

@@ -200,7 +200,9 @@ func (app *WorkerApp) Start() error {
 	go app.publishStatusPeriodically()
 
 	// Publish initial status
-	app.publishStatus()
+	if err := app.publishStatus(); err != nil {
+		log.Printf("Failed to publish initial status: %v", err)
+	}
 
 	log.Printf("Worker %s is ready and waiting for tasks", app.workerID)
 

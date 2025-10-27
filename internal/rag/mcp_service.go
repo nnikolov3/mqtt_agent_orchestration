@@ -377,7 +377,7 @@ func (s *MCPService) fallbackSearch(query types.RAGQuery) *types.RAGResponse {
 
 	// Find relevant documents based on query keywords
 	var docs []types.RAGDocument
-	queryLower := fmt.Sprintf("%s", query.Query)
+	queryLower := query.Query
 
 	for collection, collectionDocs := range knowledge {
 		if query.Collection == "" || query.Collection == collection {

@@ -235,15 +235,15 @@ func (m *ModeManager) GetModeStats() ModeStats {
 	remote := m.filterRemoteProviders(available)
 
 	return ModeStats{
-		CurrentMode:       m.currentMode,
-		LocalProviders:    len(local),
-		RemoteProviders:   len(remote),
-		TotalProviders:    len(available),
-		AvailableLocal:    getProviderNames(local),
-		AvailableRemote:   getProviderNames(remote),
-		LastModeChange:    time.Now(),
-		ModeChangeCount:   0,
-		LocalRequestCount: 0,
+		CurrentMode:        m.currentMode,
+		LocalProviders:     len(local),
+		RemoteProviders:    len(remote),
+		TotalProviders:     len(available),
+		AvailableLocal:     getProviderNames(local),
+		AvailableRemote:    getProviderNames(remote),
+		LastModeChange:     time.Now(),
+		ModeChangeCount:    0,
+		LocalRequestCount:  0,
 		RemoteRequestCount: 0,
 	}
 }
@@ -275,23 +275,23 @@ func getProviderNames(configs map[string]APIConfig) []string {
 func (m *ModeManager) filterHealthyProviders(available map[string]APIConfig) map[string]APIConfig {
 	healthy := make(map[string]APIConfig)
 	healthyProviders := m.circuitBreakers.GetHealthyProviders()
-	
+
 	// If no circuit breaker stats exist yet, consider all providers healthy
 	if len(healthyProviders) == 0 {
 		return available
 	}
-	
+
 	healthySet := make(map[string]bool)
 	for _, provider := range healthyProviders {
 		healthySet[provider] = true
 	}
-	
+
 	for name, config := range available {
 		if healthySet[name] {
 			healthy[name] = config
 		}
 	}
-	
+
 	return healthy
 }
 
@@ -347,9 +347,9 @@ func (m *ModeManager) GetProviderCapabilities() ProviderCapabilities {
 	defer m.mu.RUnlock()
 
 	available := m.config.GetAvailableAPIs()
-	
+
 	var capabilities ProviderCapabilities
-	
+
 	switch m.currentMode {
 	case LOCAL_ONLY:
 		local := m.filterLocalProviders(available)
